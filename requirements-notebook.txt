@@ -1,7 +1,0 @@
-# Extra packages to run dengue_analysis_final.ipynb (training/analysis only).
--r requirements.txt
-matplotlib==3.11.2
-seaborn==0.13.2
-nbformat==5.11.1
-nbconvert==7.17.2
-ipykernel==7.4.0
