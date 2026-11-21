@@ -11,10 +11,10 @@ The model estimates the **combined** dengue cases for weeks +2 to +4 after an is
 
 ## Windows 10 setup (PowerShell)
 
-Requires Node.js 20+ (developed on Node 24, npm 11).
+Verified with Node.js 24.11.1 and npm 11.6.2; other versions were not tested.
 
 ```powershell
-cd D:\denguehackathon\frontend
+cd frontend          # from the repository root
 npm install
 ```
 
@@ -23,17 +23,18 @@ fonts, images, map tiles or analytics).
 
 ## Start everything
 
-1. Backend (see `../backend/README.md` for its environment), in one terminal:
+1. Backend, in one terminal opened at the repository root. Create and activate the Python environment
+   first as described in the [root README](../README.md) and `../backend/README.md`:
 
    ```powershell
-   cd D:\denguehackathon\backend
-   & "$env:USERPROFILE\venvs\dengue-app\Scripts\python.exe" -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
+   cd backend
+   python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
    ```
 
-2. Frontend, in a second terminal:
+2. Frontend, in a second terminal opened at the repository root (after `npm install` above):
 
    ```powershell
-   cd D:\denguehackathon\frontend
+   cd frontend
    npm run dev
    ```
 
@@ -54,9 +55,9 @@ via `DENGUE_CORS_ORIGINS`).
 | `npm run build` | Typecheck and production build into `dist/` |
 | `npm run preview` | Serve the production build on 127.0.0.1:5173 |
 
-On Windows, run the commands from PowerShell with the repo path typed as `D:\...`. Under
-Git Bash a lower-case `/d/...` working directory makes Vitest fail to start ("failed to
-find the current suite").
+On Windows, run the commands from PowerShell using the normal drive-letter path (for example
+`D:\...`). Under Git Bash with a lower-case `/d/...` working directory, Vitest failed to start
+("failed to find the current suite") on the author's machine.
 
 ## What the dashboard shows
 

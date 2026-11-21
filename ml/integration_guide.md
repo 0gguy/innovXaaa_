@@ -19,36 +19,43 @@ The bundled organizer data runs from **2016-01-04 to 2025-12-29**. Valid issue w
 
 ## 2. Install
 
-Tested with Python 3.13 on Linux x86_64.
+Original testing: Python 3.13 on Linux x86_64. Windows 10 with Python 3.13.1 was verified later (22 Nov 2026) for the **portable** path only; other platforms and Python versions were not tested.
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-python -m pytest -q tests          # expect: 37 passed
+python -m pytest -q tests/test_portable_api.py tests/test_portable_equivalence.py   # expect: 48 passed (Linux and Windows 10)
+python -m pytest -q tests/test_package.py          # legacy original-loader suite: 37 passed on Linux; errors on Windows
 ```
 
-`requirements.txt` pins `scikit-learn==1.6.1` and `xgboost==3.4.1`, the versions the model file was saved with. Don't change them: the model is a pickled scikit-learn pipeline, and another scikit-learn version may refuse it or behave differently. No network access, external API or GPU is needed.
+> **Windows: use `predict_portable.py`.** The examples in this guide use the API shared by `predict.py` and `predict_portable.py`. On Windows import from `predict_portable`; the original `predict.py` loader does not load the combined joblib there.
+
+`requirements.txt` pins `scikit-learn==1.6.1` and `xgboost==3.4.1`, the versions the model file was saved with. Don't change them: the original model is a pickled scikit-learn pipeline, and another scikit-learn version may refuse it or behave differently. No network access, external API or GPU is needed.
 
 ## 3. Files the backend needs
 
 | File | Purpose |
 | --- | --- |
-| `predict.py` | Inference API (`forecast`, `forecast_all`, `forecast_from_records`) |
-| `features.py` | Feature builder shared with training. Required by `predict.py`; don't copy its logic |
-| `dengue_xgboost_model.joblib` | Trained pipeline (one-hot encoder + XGBoost), 1.3 MB |
+| `predict_portable.py` | **Supported (Windows) inference API**: `forecast`, `forecast_all`, `forecast_from_records`, `get_forecaster` |
+| `dengue_xgboost_model.ubj` (fallback `.json`) | Trained XGBoost booster in native format, used by `predict_portable.py` |
+| `dengue_preprocessor.joblib` (fallback `.json`) | Small fitted scikit-learn one-hot preprocessor; contains no XGBoost object |
+| `portable_manifest.json` | SHA-256 and sizes of the four portable artifacts, checked on every load |
+| `predict.py` | Original inference API; `predict_portable.py` inherits its feature, tier and driver logic. **Legacy as an entry point on Windows** |
+| `features.py` | Feature builder shared with training. Required by both loaders; don't copy its logic |
+| `dengue_xgboost_model.joblib` | Legacy: original trained pipeline (one-hot encoder + XGBoost), 1.3 MB. Not loadable on the project's Windows setup |
 | `model_config.json` | Feature order, tiers, alert rule, ward→city map, valid weeks, training ranges, metrics, versions |
 | `data/dengue_dataset.csv` | Organizer CSV, the history the forecasts are built from. Set `DENGUE_DATA_PATH` to use another location |
 | `eval/*.csv`, `eval/metrics_summary.json` | Precomputed evaluation results for the dashboard (optional) |
 
-Keep the four `.py`/`.joblib`/`.json` files in one folder. `predict.py` finds the others relative to itself.
+Keep these files in one folder. The loaders find the others relative to themselves.
 
 ## 4. Load once, then call
 
 ```python
-from predict import forecast, forecast_all, get_forecaster, ForecastError
+from predict_portable import forecast, forecast_all, get_forecaster, ForecastError   # legacy: `from predict import ...` (same API, original loader)
 
-fc = get_forecaster()      # loads model + config + CSV once (~1.4 s); later calls reuse it
+fc = get_forecaster()      # loads model + config + CSV once (~1.4 s on the Linux test machine); later calls reuse it
 fc.wards()                 # the 60 valid ward IDs
 fc.valid_issue_weeks()     # {'first': '2016-02-01', 'last': '2025-12-29', ...}
 ```
@@ -84,9 +91,10 @@ r = fc.forecast_from_records(records, "DSCC_Ward_06", "2026-01-05")
 ### Command line
 
 ```bash
-python predict.py 2025-06-16 DNCC_Ward_12      # one ward, JSON to stdout
-python predict.py 2025-06-16 --all             # all wards
-python examples/example_inference.py           # minimal end-to-end example
+python predict_portable.py 2025-06-16 DNCC_Ward_12      # one ward, JSON to stdout
+python predict_portable.py 2025-06-16 --all             # all 60 wards
+python examples/quickstart.py                           # minimal end-to-end example
+# legacy original loader (not for Windows): python predict.py ...  /  python examples/example_inference.py
 ```
 
 ## 5. Output schema (one forecast)
@@ -160,7 +168,7 @@ These tiers are **provisional, model-defined bands on absolute case counts**. Th
 
 ## 7. Feature names and order
 
-The backend never builds features: `predict.py` calls `features.build_features`. For reference, the model expects these 32 columns in this order (also in `model_config.json → feature_columns`):
+The backend never builds features: the loaders call `features.build_features`. For reference, the model expects these 32 columns in this order (also in `model_config.json → feature_columns`):
 
 ```
 population_density_sqkm, water_logging_risk_index, sanitation_score,
@@ -196,7 +204,7 @@ Example FastAPI wrapper:
 
 ```python
 from fastapi import FastAPI, HTTPException
-from predict import get_forecaster, ForecastError
+from predict_portable import get_forecaster, ForecastError   # legacy: from predict import ...
 
 app = FastAPI()
 fc = get_forecaster()
@@ -221,7 +229,7 @@ FastAPI isn't in `requirements.txt`; add it if you use it.
 
 ## 9. Cost and performance
 
-Measured in a clean virtual environment, on 2 vCPUs:
+Measured on a Linux machine in a clean virtual environment, on 2 vCPUs (not re-measured on Windows):
 
 * Startup: 1.35 s (load the model and build the feature table for 31,320 rows once).
 * One ward: 7 ms, or 11 ms with drivers.

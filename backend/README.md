@@ -14,26 +14,24 @@ Windows-incompatible joblib loader in `ml/predict.py`. Nothing is retrained.
 
 ## Windows 10 setup (PowerShell)
 
-The backend needs the backend **and** ML packages in one environment. Keep it outside the
-repository so it is never committed.
+The backend needs the backend **and** ML packages in one Python environment. Run these from
+the repository root; they match the Quick start in the [root README](../README.md). The
+`.venv` folder is ignored by Git.
 
 ```powershell
-cd D:\denguehackathon
-
-python -m venv $env:USERPROFILE\venvs\dengue-app          # Python 3.13
-& "$env:USERPROFILE\venvs\dengue-app\Scripts\Activate.ps1"
-# If scripts are blocked:  Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
-
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1          # if scripts are blocked: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 python -m pip install -r backend\requirements.txt -r ml\requirements.txt
 ```
 
-Verified with Python 3.13.1, FastAPI 0.165.0, uvicorn 0.54.0, numpy 2.5.5, pandas 3.1.1,
-scikit-learn 1.6.1, xgboost 3.4.1.
+Verified on Windows 10 with Python 3.13.1, FastAPI 0.165.0, uvicorn 0.54.0, numpy 2.5.5,
+pandas 3.1.1, scikit-learn 1.6.1 and xgboost 3.4.1 (the pinned requirements). Other Python
+versions and operating systems were not tested.
 
 ## Run the server (local demo)
 
 ```powershell
-cd D:\denguehackathon\backend
+cd backend          # from the repository root, with the environment active
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
 ```
 
@@ -44,7 +42,7 @@ No `--reload` is used.
 ## Run the tests
 
 ```powershell
-cd D:\denguehackathon\backend
+cd backend          # from the repository root
 python -m pytest -q                      # 36 tests: foundation + model integration
 cd ..; python -m pytest ml\tests\test_portable_api.py ml\tests\test_portable_equivalence.py -q   # 48 portable ML tests
 ```

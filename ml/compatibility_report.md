@@ -1,4 +1,4 @@
-# Compatibility report (generated on Linux; Windows not verified)
+# Compatibility report (generated on Linux; Windows result added at the end)
 
 Model: dengue-xgb-2to4w-1.1.0. No retraining, no refit, no change to features, target, split, hyperparameters, horizon, tiers or alert rule.
 
@@ -10,6 +10,15 @@ Full public-API comparison `forecast_all` (with drivers) for all 518 valid weeks
 
 **Tests (Linux)**: original package 37/37 pass; portable 48/48 pass (37 adapted API + 11 equivalence/robustness).
 
-**Not verified**: anything on Windows; the root cause of the Windows failure. Hypothesis only: XGBoost's pickle "memory snapshot" restore path failed on that machine. The native files use a different entry point but the same parser family, so they may or may not load there; hence the JSON fallbacks and `tools/windows_diagnose.py`.
+**Not verified (as of this Linux report; see the Windows update below)**: anything on Windows; the root cause of the Windows failure. Hypothesis only: XGBoost's pickle "memory snapshot" restore path failed on that machine. The native files use a different entry point but the same parser family, so they may or may not load there; hence the JSON fallbacks and `tools/windows_diagnose.py`.
 
 **Float risk**: 1 of 31,080 predictions lies within 1e-3 of a tier edge or 25. A different CPU/build could in principle flip that tier; the Windows equivalence test exercises it.
+
+## Windows update (22 Nov 2026)
+
+Windows 10, Python 3.13.1, xgboost 3.4.1, scikit-learn 1.6.1, numpy 2.5.5 (the pinned `requirements.txt`). Observed in this repository:
+
+* Portable suite `tests/test_portable_api.py` + `tests/test_portable_equivalence.py`: **48 passed** (including the equivalence tests against reference cases produced by the original pipeline).
+* The loader reported `dengue_xgboost_model.ubj` and `dengue_preprocessor.joblib` as the files in use.
+* Original `tests/test_package.py` (original joblib loader): **errored** (`XGBoostError: input stream corrupted`; 26 errors in one full run). The root cause was not investigated; the hypothesis above is unchanged.
+* `tools/windows_diagnose.py` was not run. Other Windows or Python versions were not tested. The Linux figures above were not re-run here.

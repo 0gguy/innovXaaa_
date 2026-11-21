@@ -252,21 +252,23 @@ history on `main` and the two feature branches shows; it is not a measure of eff
 
 | Member | Responsibilities (team-provided) | Git history |
 | --- | --- | --- |
-| **Masnoon Mohammad Tahseen Islam** | Application architecture and planning; FastAPI backend; React + TypeScript frontend; portable XGBoost model integration; API implementation and testing; end-to-end integration and browser verification; GitHub integration and coordination. | Git author metadata shows two names with the same e-mail address: `Masnoon Mohammad Tahseen Islam` (6 commits, each deleting files: `predict.py`, `model_config.json`, `model_report.md`, `integration_guide.md`, `requirements-notebook.txt` and a `requirements.txt`) and `0gguy` (4 commits: portable inference, backend foundation, model integration, frontend). |
+| **Masnoon Mohammad Tahseen Islam** | Application architecture and planning; FastAPI backend; React + TypeScript frontend; portable XGBoost model integration; API implementation and testing; end-to-end integration and browser verification; GitHub integration and coordination. | Git author metadata shows two names with the same e-mail address: `Masnoon Mohammad Tahseen Islam` (6 commits, each deleting files: `predict.py`, `model_config.json`, `model_report.md`, `integration_guide.md`, `requirements-notebook.txt` and a `requirements.txt`) and `0gguy` (6 commits as of `996cb06`: portable inference, backend foundation, model integration, frontend and two documentation commits). Git records only these names and the shared e-mail address; that both belong to this member is stated by the team, not verified by Git. |
 | **Muhammad Asir Hossain Chowdhury** | Dataset analysis and exploration; machine-learning workflow; XGBoost development and evaluation; model documentation and artifacts; portable model export and compatibility work. | 14 commits on `main`: 3 file uploads (the last one adds the ML package: dataset, notebook, `features.py`, trained model, evaluation files, model report, integration guide), 1 README creation and 10 file or directory deletions. |
-| **S.M. Gazi Salauddin Chowdhury** | Experimental weather-lag preprocessing; experimental Random Forest training and validation; documentation and presentation. | 2 commits, **only on separate feature branches** (below), not on `main`. |
+| **S.M. Gazi Salauddin Chowdhury** | Experimental weather-lag preprocessing; experimental Random Forest training and validation; documentation and presentation. | 2 commits, **only on separate feature branches** (below), not on `main`. Documentation and presentation work is not visible in Git. |
 
 Experimental branches (not merged, not part of the deployed application):
 
-- `feat/weather-lag-pipeline`: a weather-lag preprocessing script and processed dataset.
-- `feat/train-dengue-model`: a Random Forest trained on a chronological split of that processed data.
+- [`feat/weather-lag-pipeline`](https://github.com/0gguy/innovXaaa_/tree/feat/weather-lag-pipeline): a weather-lag preprocessing script and processed dataset.
+- [`feat/train-dengue-model`](https://github.com/0gguy/innovXaaa_/tree/feat/train-dengue-model): a Random Forest trained on a chronological split of that processed data.
 
-That experiment predicts a single week's cases with different features and tier cut-offs. **The deployed
-model is the XGBoost model described above**, and the experiment's MAE must not be compared with the
-XGBoost combined-horizon MAE.
+That experiment predicts a single week's cases with different features and tier cut-offs; it is **not
+deployed**. **The deployed model is the XGBoost model described above**, and the experiment's MAE must not be
+compared with the XGBoost combined-horizon MAE.
 
-Most commits on `main` were made within about two hours on 2026-11-22 (Bangladesh time); the history
-therefore reflects repository consolidation more than the pace of the underlying work.
+As of commit `996cb06`, every commit on `main` was made between 00:03 and 02:40 on 2026-11-22 (Bangladesh time),
+and both feature-branch commits fall in the same night (about 00:08 and 00:18). The public history therefore
+does not show activity spread across the full 24-hour window, and reflects repository consolidation more than the
+pace of the underlying work.
 
 ## 10. AI tools and development disclosure
 
