@@ -1,0 +1,50 @@
+{
+ "rows": 30840,
+ "joblib_pre+ubj": {
+  "max_abs": 0.0,
+  "mean_abs": 0.0,
+  "bit_identical": true,
+  "tier_mismatch": 0,
+  "alert_mismatch": 0
+ },
+ "joblib_pre+json": {
+  "max_abs": 0.0,
+  "mean_abs": 0.0,
+  "bit_identical": true,
+  "tier_mismatch": 0,
+  "alert_mismatch": 0
+ },
+ "json_pre+ubj": {
+  "max_abs": 0.0,
+  "mean_abs": 0.0,
+  "bit_identical": true,
+  "tier_mismatch": 0,
+  "alert_mismatch": 0
+ },
+ "json_pre+json": {
+  "max_abs": 0.0,
+  "mean_abs": 0.0,
+  "bit_identical": true,
+  "tier_mismatch": 0,
+  "alert_mismatch": 0
+ },
+ "preproc_matrix_equal": {
+  "joblib": true,
+  "json": true,
+  "names_equal": true
+ },
+ "shap_max_abs_diff": 0.0,
+ "test_ref_columns": [
+  "ward_id",
+  "city",
+  "issue_week",
+  "actual_cases_3wk",
+  "predicted_cases_3wk",
+  "error",
+  "predicted_tier",
+  "actual_tier",
+  "early_alert"
+ ],
+ "near_edges_1e-3": 1,
+ "near_edges_1e-2": 30
+}

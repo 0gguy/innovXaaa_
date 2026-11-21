@@ -1,0 +1,59 @@
+{
+  "purpose": "Pickle-free / snapshot-free export of the already-trained model. Predictions are identical to the original pipeline (see compatibility_report.md).",
+  "model_version": "dengue-xgb-2to4w-1.1.0",
+  "source_artifact": {
+    "file": "dengue_xgboost_model.original.joblib",
+    "sha256": "d4929bcaf88e23513fd8febce9eb144034d1b39fc9089c68260548495b564c33",
+    "bytes": 1327432
+  },
+  "created_with": {
+    "python": "3.13.18",
+    "platform": "Linux-6.18.44-fc-v726-x86_64-with-glibc2.39",
+    "numpy": "2.5.5",
+    "scikit-learn": "1.6.1",
+    "xgboost": "3.4.1",
+    "joblib": "1.6.0"
+  },
+  "artifacts": {
+    "dengue_xgboost_model.ubj": {
+      "bytes": 1312020,
+      "sha256": "f231f0a448181ad7d636bb7546371edba0fc45923e1f3c3e32fc11f1cac914ad"
+    },
+    "dengue_xgboost_model.json": {
+      "bytes": 1695757,
+      "sha256": "6a109832405d15515c67fbbb32a643cd2c6f262e175560074288e047e482e825"
+    },
+    "dengue_preprocessor.joblib": {
+      "bytes": 5191,
+      "sha256": "31ca9dba3319e3036ced92bf73bda6fda9bcd19a43a49af928c4079f8c7930f4"
+    },
+    "dengue_preprocessor.json": {
+      "bytes": 5684,
+      "sha256": "c198483a3df629db32d33f1e933540dc9235bc35b977168befa2f8c8e2f18092"
+    }
+  },
+  "load_order": {
+    "model": [
+      "dengue_xgboost_model.ubj",
+      "dengue_xgboost_model.json"
+    ],
+    "preprocessor": [
+      "dengue_preprocessor.joblib",
+      "dengue_preprocessor.json"
+    ]
+  },
+  "model": {
+    "num_boosted_rounds": 500,
+    "num_features": 95,
+    "objective": "reg:squarederror",
+    "base_score": "[8.011655E0]",
+    "feature_names_stored_in_model": null
+  },
+  "preprocessor_pickle_modules": [
+    "joblib.numpy_pickle",
+    "numpy",
+    "numpy._core.multiarray",
+    "sklearn.compose._column_transformer",
+    "sklearn.preprocessing._encoders"
+  ]
+}

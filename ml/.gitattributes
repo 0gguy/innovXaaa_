@@ -1,0 +1,10 @@
+# Scope: this directory (ml/) only. Never convert line endings of model artifacts:
+# a CRLF conversion changes their bytes and breaks the SHA-256 check in predict_portable.py.
+*.ubj binary
+*.joblib binary
+*.pkl binary
+dengue_xgboost_model.json -text
+dengue_preprocessor.json -text
+portable_manifest.json -text
+reference/reference_cases.csv -text
+reference/equivalence_linux_result.json -text
