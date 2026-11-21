@@ -1,6 +1,6 @@
 import type { Meta } from "../api/types";
-import { formatDate, weeksBetween, yearOf } from "../lib/dates";
-import { wardLabel } from "../lib/format";
+import { useI18n } from "../i18n/I18n";
+import { weeksBetween, yearOf } from "../lib/dates";
 
 export interface Selection {
   city: string;
@@ -16,6 +16,7 @@ interface Props {
 }
 
 export function Controls({ meta, value, onChange, busy }: Props) {
+  const { t, int, city: cityName, ward: wardName, dayMonth } = useI18n();
   const weeks = weeksBetween(meta.valid_issue_weeks.first, meta.valid_issue_weeks.last);
   const years = [...new Set(weeks.map(yearOf))];
   const year = yearOf(value.date);
@@ -40,58 +41,58 @@ export function Controls({ meta, value, onChange, busy }: Props) {
   };
 
   return (
-    <form className="controls" aria-label="Choose city, ward and issue week" onSubmit={(e) => e.preventDefault()}>
+    <form className="controls" aria-label={t.controlsLabel} onSubmit={(e) => e.preventDefault()}>
       <div className="field">
-        <label htmlFor="city">City corporation</label>
+        <label htmlFor="city">{t.city}</label>
         <select id="city" value={value.city} onChange={(e) => setCity(e.target.value)}>
           {meta.cities.map((c) => (
             <option key={c.city} value={c.city}>
-              {c.city} ({c.ward_count} wards)
+              {t.cityOption(cityName(c.city), int(c.ward_count))}
             </option>
           ))}
         </select>
       </div>
       <div className="field">
-        <label htmlFor="ward">Ward</label>
+        <label htmlFor="ward">{t.ward}</label>
         <select id="ward" value={value.ward} onChange={(e) => onChange({ ...value, ward: e.target.value })}>
           {cityWards.map((w) => (
             <option key={w} value={w}>
-              {wardLabel(w)}
+              {wardName(w)}
             </option>
           ))}
         </select>
       </div>
       <fieldset className="field field-week">
-        <legend>Historical issue week (Mondays)</legend>
+        <legend>{t.weekLegend}</legend>
         <div className="week-row">
           <button
             type="button"
             className="btn btn-icon"
             onClick={() => step(-1)}
             disabled={index <= 0}
-            aria-label="Previous week"
+            aria-label={t.prevWeek}
           >
             <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
               <path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
           <label className="sr-only" htmlFor="year">
-            Year
+            {t.year}
           </label>
           <select id="year" value={year} onChange={(e) => setYear(Number(e.target.value))}>
             {years.map((y) => (
               <option key={y} value={y}>
-                {y}
+                {int(y).replace(/,/g, "")}
               </option>
             ))}
           </select>
           <label className="sr-only" htmlFor="week">
-            Week
+            {t.week}
           </label>
           <select id="week" value={value.date} onChange={(e) => onChange({ ...value, date: e.target.value })}>
             {weeksInYear.map((w) => (
               <option key={w} value={w}>
-                Week of {formatDate(w).replace(/ \d{4}$/, "")}
+                {t.weekOf(dayMonth(w))}
               </option>
             ))}
           </select>
@@ -100,7 +101,7 @@ export function Controls({ meta, value, onChange, busy }: Props) {
             className="btn btn-icon"
             onClick={() => step(1)}
             disabled={index < 0 || index >= weeks.length - 1}
-            aria-label="Next week"
+            aria-label={t.nextWeek}
           >
             <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
               <path d="m6 3 5 5-5 5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -109,7 +110,7 @@ export function Controls({ meta, value, onChange, busy }: Props) {
         </div>
       </fieldset>
       <p className="controls-status" role="status" aria-live="polite">
-        {busy ? "Updating forecasts…" : "Forecasts up to date"}
+        {busy ? t.updating : t.upToDate}
       </p>
     </form>
   );

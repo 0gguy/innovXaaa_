@@ -1,26 +1,18 @@
 import type { ReactNode } from "react";
 import { ApiError } from "../api/client";
+import type { I18n } from "../i18n/I18n";
+import { useI18n } from "../i18n/I18n";
 
-export function describeError(error: ApiError, baseUrl: string): { title: string; body: string } {
-  if (error.kind === "network")
-    return {
-      title: "Can't reach the forecast service",
-      body: `Nothing answered at ${baseUrl}. Start the backend (see frontend/README.md), then retry.`,
-    };
-  if (error.kind === "timeout")
-    return { title: "The forecast service is slow to answer", body: "The request timed out. Retry in a moment." };
-  if (error.kind === "http" && error.code === "model_unavailable")
-    return {
-      title: "The forecast model isn't loaded",
-      body: "The backend is running, but its model failed to load, so no forecasts can be shown. Check the backend log, then retry.",
-    };
+export function describeError(error: ApiError, baseUrl: string, i: I18n): { title: string; body: string } {
+  const { t, lang } = i;
+  if (error.kind === "network") return { title: t.errNetwork, body: t.errNetworkBody(baseUrl) };
+  if (error.kind === "timeout") return { title: t.errTimeout, body: t.errTimeoutBody };
+  if (error.kind === "http" && error.code === "model_unavailable") return { title: t.errModel, body: t.errModelBody };
   if (error.kind === "http" && error.code === "issue_week_out_of_range")
-    return { title: "No data for that week", body: error.message };
-  if (error.kind === "http") return { title: "The request was rejected", body: error.message };
-  return {
-    title: "Unexpected response from the backend",
-    body: "The data did not match what this dashboard expects. Retry, or check that the backend version matches.",
-  };
+    return { title: t.errWeek, body: lang === "bn" ? t.errWeekBody : error.message };
+  // Backend-authored messages are English only; in Bangla we keep them as a quoted detail.
+  if (error.kind === "http") return { title: t.errRejected, body: error.message };
+  return { title: t.errShape, body: t.errShapeBody };
 }
 
 export function ErrorPanel({
@@ -34,13 +26,15 @@ export function ErrorPanel({
   onRetry: () => void;
   compact?: boolean;
 }) {
-  const { title, body } = describeError(error, baseUrl);
+  const i = useI18n();
+  const { title, body } = describeError(error, baseUrl, i);
+  const rawEnglish = i.lang === "bn" && error.kind === "http" && error.code !== "issue_week_out_of_range" && error.code !== "model_unavailable";
   return (
     <div className={`status status-error${compact ? " status-compact" : ""}`} role="alert">
       <h3>{title}</h3>
-      <p>{body}</p>
+      <p lang={rawEnglish ? "en" : undefined}>{body}</p>
       <button type="button" className="btn" onClick={onRetry}>
-        Retry
+        {i.t.retry}
       </button>
     </div>
   );

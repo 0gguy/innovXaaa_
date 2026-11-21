@@ -16,7 +16,8 @@ async function ready() {
 describe("dashboard", () => {
   it("shows the historical replay framing and the backend notice", async () => {
     await ready();
-    expect(screen.getAllByText("Historical replay").length).toBeGreaterThan(0);
+    expect(document.querySelector(".replay-badge")).toBeNull(); // header badge removed; the disclaimers remain
+    expect(screen.getByRole("note")).toHaveTextContent(/Historical replay of a trained model/);
     expect(screen.getByText(/Not a live warning system/)).toBeInTheDocument();
     expect(screen.getByText(NOTICE)).toBeInTheDocument();
     expect(screen.getAllByText(/weeks \+2 to \+4/).length).toBeGreaterThan(0);
@@ -75,10 +76,10 @@ describe("dashboard", () => {
   it("renders the single-ward forecast with tier, alert rule and observed outcome", async () => {
     await ready();
     const detail = screen.getByRole("region", { name: "DNCC Ward 12" });
-    expect(within(detail).getByText("31.2")).toBeInTheDocument();
+    expect(detail.querySelector(".result-num")).toHaveTextContent("31.2");
     expect(within(detail).getByText("Risk tier").parentElement).toHaveTextContent("Critical");
     expect(within(detail).getByText("Raised")).toBeInTheDocument();
-    expect(within(detail).getByText(/above 25/)).toBeInTheDocument();
+    expect(within(detail).getByText(/above the alert line of 25 cases/)).toBeInTheDocument();
     expect(within(detail).getByText(/One combined total for weeks \+2 to \+4/)).toBeInTheDocument();
     const observed = within(detail).getByRole("heading", { name: "Observed later (historical comparison)" });
     expect(observed.parentElement).toHaveTextContent("33 cases were recorded");
@@ -119,7 +120,7 @@ describe("dashboard", () => {
     });
     render(<App client={client} />);
     expect(await screen.findByText(/did not return driver details/)).toBeInTheDocument();
-    expect(document.querySelector(".statement-num")).toHaveTextContent("31.2");
+    expect(document.querySelector(".result-num")).toHaveTextContent("31.2");
   });
 
   it("summarises all wards by tier and by city", async () => {
@@ -165,7 +166,7 @@ describe("dashboard", () => {
     const client = fakeClient({ forecastWard: () => Promise.reject(new ApiError("network", "x")) });
     render(<App client={client} />);
     const region = await screen.findByRole("region", { name: "Ward forecast" });
-    expect(within(region).getByRole("alert")).toBeInTheDocument();
+    expect(await within(region).findByRole("alert")).toBeInTheDocument();
   });
 
   it("describes the forecast as a combined total after the issue week, not weekly values", async () => {
@@ -174,9 +175,9 @@ describe("dashboard", () => {
     expect(screen.getByText(/One combined total for weeks \+2 to \+4, not three separate weekly forecasts/)).toBeInTheDocument();
   });
 
-  it("states that the ward register is not a map and the methodology cites its evaluation context", async () => {
+  it("states that the ward charts are not a map and the methodology cites its evaluation context", async () => {
     await ready();
-    expect(screen.getByText(/This is a register, not a map/)).toBeInTheDocument();
+    expect(screen.getByText(/This is not a map/)).toBeInTheDocument();
     expect(screen.getByText(/held-out test set \(4,620 ward-weeks, issue weeks 17 Jun 2024 to 1 Dec 2025\)/)).toBeInTheDocument();
   });
 

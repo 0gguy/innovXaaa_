@@ -6,7 +6,8 @@ import { Methodology } from "./components/Methodology";
 import { Overview } from "./components/Overview";
 import { ErrorPanel, LoadingPanel } from "./components/StatusPanel";
 import { WardDetail } from "./components/WardDetail";
-import { formatDate, weeksBetween } from "./lib/dates";
+import { I18nProvider, useI18n } from "./i18n/I18n";
+import { weeksBetween } from "./lib/dates";
 import { useRequest } from "./lib/useRequest";
 
 // A replay week in peak season where wards fall in several tiers. Used only if /meta says it is valid.
@@ -23,23 +24,29 @@ export function initialSelection(meta: Meta): Selection {
   return { city, ward, date };
 }
 
-function ReplayBadge() {
+/** English | বাংলা. Each label is in its own language so it is findable from either one. */
+function LanguageSwitch() {
+  const { lang, setLang, t } = useI18n();
   return (
-    <span className="replay-badge">
-      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-        <path d="M3 8a5 5 0 1 0 1.6-3.7M3 2.5v3h3" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-      Historical replay
-    </span>
+    <div className="lang-switch" role="group" aria-label={t.langGroup}>
+      <button type="button" lang="en" aria-pressed={lang === "en"} aria-label={t.langEnLabel} onClick={() => setLang("en")}>
+        English
+      </button>
+      <button type="button" lang="bn" aria-pressed={lang === "bn"} aria-label={t.langBnLabel} onClick={() => setLang("bn")}>
+        বাংলা
+      </button>
+    </div>
   );
 }
 
-export default function App({ client: injected }: { client?: ApiClient }) {
+function Dashboard({ injected }: { injected?: ApiClient }) {
+  const { t, lang, date } = useI18n();
   const client = useMemo(() => injected ?? createClient(), [injected]);
   const metaReq = useRequest<Meta>("meta", (signal) => client.meta(signal));
   const meta = metaReq.data;
 
   // Until the user changes something, the selection is derived from /meta (no effect needed).
+  // It lives here, above the language, so switching language never resets it.
   const [chosen, setSelection] = useState<Selection | null>(null);
   const selection = chosen ?? (meta ? initialSelection(meta) : null);
 
@@ -60,41 +67,37 @@ export default function App({ client: injected }: { client?: ApiClient }) {
   return (
     <>
       <a className="skip-link" href="#main">
-        Skip to forecasts
+        {t.skip}
       </a>
       <header className="masthead">
         <div className="masthead-inner">
-          <div className="brand">
-            <svg viewBox="0 0 32 32" width="34" height="34" aria-hidden="true" className="brand-mark">
-              <rect width="32" height="32" rx="8" fill="currentColor" opacity="0.14" />
-              <path d="M6 21c4.2 0 4.2-10 10-10s5.8 10 10 10" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
-            </svg>
-            <span className="brand-name">Dengue Outlook</span>
-            <ReplayBadge />
+          <div className="masthead-top">
+            <div className="brand">
+              <svg viewBox="0 0 32 32" width="34" height="34" aria-hidden="true" className="brand-mark">
+                <rect width="32" height="32" rx="8" fill="currentColor" opacity="0.14" />
+                <path d="M6 21c4.2 0 4.2-10 10-10s5.8 10 10 10" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
+              </svg>
+              <span className="brand-name">{t.brand}</span>
+            </div>
+            <LanguageSwitch />
           </div>
           {selection && (
-            <aside className="replay-now" aria-label="Selected issue week">
-              <p className="replay-now-label">Replaying the issue week of</p>
-              <p className="replay-now-date">{formatDate(selection.date)}</p>
-              <p className="replay-now-note">Combined dengue cases forecast for weeks +2 to +4.</p>
+            <aside className="replay-now" aria-label={t.replayLabel}>
+              <p className="replay-now-label">{t.replayingOf}</p>
+              <p className="replay-now-date">{date(selection.date)}</p>
+              <p className="replay-now-note">{t.replayNote}</p>
             </aside>
           )}
-          <h1>Ward-level dengue forecasts for Bangladesh's cities, replayed from historical data</h1>
-          <p className="masthead-lede">
-            A trained model reads each ward's recent weather and case counts, then estimates the combined dengue cases
-            for weeks +2 to +4. Sixty wards, five city corporations, weekly records through 29 Dec 2025.
-          </p>
+          <h1>{t.h1}</h1>
+          <p className="masthead-lede">{t.lede}</p>
           <p className="masthead-notice" role="note">
-            <strong>Not a live warning system.</strong>{" "}
-            {meta ? meta.notice : "Forecasts are replayed from historical data and are model estimates, not verified real-world warnings."}
+            <strong>{t.notLive}</strong> {lang === "bn" ? t.notice : meta ? meta.notice : t.noticeFallback}
           </p>
         </div>
       </header>
 
       <main id="main" className="page">
-        {metaReq.status === "loading" || metaReq.status === "idle" ? (
-          <LoadingPanel label="Connecting to the forecast service…" />
-        ) : null}
+        {metaReq.status === "loading" || metaReq.status === "idle" ? <LoadingPanel label={t.connecting} /> : null}
         {metaReq.status === "error" && metaReq.error && (
           <ErrorPanel error={metaReq.error} baseUrl={client.baseUrl} onRetry={metaReq.reload} />
         )}
@@ -121,5 +124,13 @@ export default function App({ client: injected }: { client?: ApiClient }) {
         <Methodology meta={meta} />
       </main>
     </>
+  );
+}
+
+export default function App({ client }: { client?: ApiClient }) {
+  return (
+    <I18nProvider>
+      <Dashboard injected={client} />
+    </I18nProvider>
   );
 }

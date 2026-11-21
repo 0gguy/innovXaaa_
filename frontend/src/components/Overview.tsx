@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
 import type { AllForecastsResponse, Forecast, Meta, RiskTier } from "../api/types";
 import { TIER_ORDER } from "../api/types";
-import { formatDate } from "../lib/dates";
-import { cases, countByTier, TIER_MARK, wardLabel, wardNumber } from "../lib/format";
+import { useI18n } from "../i18n/I18n";
+import { countByTier } from "../lib/format";
 import type { RequestState } from "../lib/useRequest";
 import { EmptyPanel, ErrorPanel, LoadingPanel } from "./StatusPanel";
 import { TierChip } from "./TierChip";
+import { WardCharts } from "./WardCharts";
 
 interface Props {
   request: RequestState<AllForecastsResponse>;
@@ -17,28 +18,25 @@ interface Props {
 }
 
 export function Overview({ request, meta, issueDate, selectedWard, onSelectWard, baseUrl }: Props) {
+  const { t, int, date } = useI18n();
   return (
     <section className="overview" aria-labelledby="overview-title" aria-busy={request.status === "loading"}>
       <div className="section-head">
-        <h2 id="overview-title">All {meta.ward_count} wards, week of {formatDate(issueDate)}</h2>
-        <p>
-          Every ward for the same issue week, from the same model. Wards are ordered by predicted cases, not by any
-          verified ranking.
-        </p>
+        <h2 id="overview-title">{t.overviewTitle(int(meta.ward_count), date(issueDate))}</h2>
+        <p>{t.overviewLead}</p>
       </div>
       {request.status === "error" && request.error && (
         <ErrorPanel error={request.error} baseUrl={baseUrl} onRetry={request.reload} />
       )}
-      {(request.status === "loading" || request.status === "idle") && (
-        <LoadingPanel label="Loading all wards for this week…" />
-      )}
+      {(request.status === "loading" || request.status === "idle") && <LoadingPanel label={t.loadingAll} />}
       {request.status === "success" && request.data && request.data.forecasts.length === 0 && (
-        <EmptyPanel title="No ward forecasts for this week" body="Choose another issue week." />
+        <EmptyPanel title={t.emptyAllTitle} body={t.emptyAllBody} />
       )}
       {request.status === "success" && request.data && request.data.forecasts.length > 0 && (
         <OverviewBody
           forecasts={request.data.forecasts}
           meta={meta}
+          issueDate={issueDate}
           selectedWard={selectedWard}
           onSelectWard={onSelectWard}
         />
@@ -47,17 +45,15 @@ export function Overview({ request, meta, issueDate, selectedWard, onSelectWard,
   );
 }
 
-function OverviewBody({
-  forecasts,
-  meta,
-  selectedWard,
-  onSelectWard,
-}: {
+interface BodyProps {
   forecasts: Forecast[];
   meta: Meta;
+  issueDate?: string;
   selectedWard: string;
   onSelectWard: (id: string) => void;
-}) {
+}
+
+function OverviewBody({ forecasts, meta, issueDate, selectedWard, onSelectWard }: BodyProps) {
   const byTier = countByTier(forecasts);
   const alerts = forecasts.filter((f) => f.early_alert).length;
   return (
@@ -66,24 +62,25 @@ function OverviewBody({
         <TierSummary byTier={byTier} total={forecasts.length} alerts={alerts} threshold={meta.early_alert.threshold} />
         <CityBreakdown forecasts={forecasts} meta={meta} />
       </div>
-      <WardRegister forecasts={forecasts} meta={meta} selectedWard={selectedWard} onSelectWard={onSelectWard} />
+      <WardCharts forecasts={forecasts} meta={meta} issueDate={issueDate ?? ""} selectedWard={selectedWard} onSelectWard={onSelectWard} />
       <WardTable forecasts={forecasts} meta={meta} selectedWard={selectedWard} onSelectWard={onSelectWard} />
     </>
   );
 }
 
 function StackedBar({ byTier, total, label }: { byTier: Record<RiskTier, number>; total: number; label: string }) {
+  const { t, int } = useI18n();
   return (
     <div className="stack" role="img" aria-label={label}>
-      {TIER_ORDER.map((t) =>
-        byTier[t] > 0 ? (
+      {TIER_ORDER.map((tier) =>
+        byTier[tier] > 0 ? (
           <span
-            key={t}
-            className={`stack-seg tier-${t.toLowerCase()}`}
-            style={{ flexGrow: byTier[t], flexBasis: 0 }}
-            title={`${t}: ${byTier[t]} of ${total}`}
+            key={tier}
+            className={`stack-seg tier-${tier.toLowerCase()}`}
+            style={{ flexGrow: byTier[tier], flexBasis: 0 }}
+            title={t.segTitle(t.tier[tier], int(byTier[tier]), int(total))}
           >
-            {byTier[t] / total > 0.08 ? byTier[t] : ""}
+            {byTier[tier] / total > 0.08 ? int(byTier[tier]) : ""}
           </span>
         ) : null,
       )}
@@ -102,44 +99,41 @@ function TierSummary({
   alerts: number;
   threshold: number;
 }) {
-  const label = TIER_ORDER.map((t) => `${byTier[t]} ${t}`).join(", ");
+  const { t, int } = useI18n();
+  const label = TIER_ORDER.map((x) => t.tierCount(int(byTier[x]), t.tier[x])).join(", ");
   return (
     <div className="tier-summary">
-      <h3>Wards by risk tier</h3>
-      <StackedBar byTier={byTier} total={total} label={`Wards by risk tier: ${label}`} />
+      <h3>{t.byTier}</h3>
+      <StackedBar byTier={byTier} total={total} label={t.byTierLabel(label)} />
       <ul className="tier-legend">
-        {TIER_ORDER.map((t) => (
-          <li key={t}>
-            <TierChip tier={t} />
-            <span className="legend-count">{byTier[t]}</span>
+        {TIER_ORDER.map((x) => (
+          <li key={x}>
+            <TierChip tier={x} />
+            <span className="legend-count">{int(byTier[x])}</span>
           </li>
         ))}
       </ul>
-      <p className="alert-line">
-        <strong>{alerts}</strong> of {total} wards are above the early-alert line (predicted combined cases &gt;{" "}
-        {threshold}).
-      </p>
+      <p className="alert-line">{t.alertLine(int(alerts), int(total), int(threshold))}</p>
     </div>
   );
 }
 
 function CityBreakdown({ forecasts, meta }: { forecasts: Forecast[]; meta: Meta }) {
+  const { t, int, city } = useI18n();
   return (
     <div className="city-breakdown">
-      <h3>By city corporation</h3>
+      <h3>{t.byCity}</h3>
       <ul>
         {meta.cities.map((c) => {
           const rows = forecasts.filter((f) => f.city === c.city);
           const by = countByTier(rows);
           const a = rows.filter((f) => f.early_alert).length;
-          const label = `${c.city}: ${TIER_ORDER.map((t) => `${by[t]} ${t}`).join(", ")}`;
+          const label = `${city(c.city)}: ${TIER_ORDER.map((x) => t.tierCount(int(by[x]), t.tier[x])).join(", ")}`;
           return (
             <li key={c.city}>
-              <span className="city-name">{c.city}</span>
+              <span className="city-name">{city(c.city)}</span>
               <StackedBar byTier={by} total={rows.length || 1} label={label} />
-              <span className="city-meta">
-                {rows.length} wards, {a} above alert line
-              </span>
+              <span className="city-meta">{t.cityMeta(int(rows.length), int(a))}</span>
             </li>
           );
         })}
@@ -148,80 +142,11 @@ function CityBreakdown({ forecasts, meta }: { forecasts: Forecast[]; meta: Meta 
   );
 }
 
-function WardRegister({
-  forecasts,
-  meta,
-  selectedWard,
-  onSelectWard,
-}: {
-  forecasts: Forecast[];
-  meta: Meta;
-  selectedWard: string;
-  onSelectWard: (id: string) => void;
-}) {
-  const byWard = new Map(forecasts.map((f) => [f.ward_id, f]));
-  return (
-    <div className="register">
-      <div className="register-head">
-        <h3>Ward register</h3>
-        <p>
-          One tile per ward, grouped by city corporation. The big number is predicted combined cases for weeks +2 to
-          +4; the letter is the risk tier. This is a register, not a map: tile position has no geographic meaning.
-        </p>
-      </div>
-      <div className="register-groups">
-        {meta.cities.map((c) => (
-          <div key={c.city} className="register-group">
-            <h4>{c.city}</h4>
-            <ul className="tiles">
-              {c.wards.map((id) => {
-                const f = byWard.get(id);
-                if (!f) return null;
-                const sel = id === selectedWard;
-                return (
-                  <li key={id}>
-                    <button
-                      type="button"
-                      className={`tile tier-${f.risk_tier.toLowerCase()}${sel ? " is-selected" : ""}${f.early_alert ? " has-alert" : ""}`}
-                      aria-pressed={sel}
-                      aria-label={`${wardLabel(id)}, ${f.risk_tier} tier, ${cases(f.predicted_cases_3wk)} predicted cases${f.early_alert ? ", early alert raised" : ""}`}
-                      onClick={() => onSelectWard(id)}
-                      title={`${wardLabel(id)}: ${f.risk_tier}, ${cases(f.predicted_cases_3wk)} cases`}
-                    >
-                      <span className="tile-ward">{wardNumber(id)}</span>
-                      <span className="tile-val">{Math.round(f.predicted_cases_3wk)}</span>
-                      <span className="tile-mark" aria-hidden="true">
-                        {TIER_MARK[f.risk_tier]}
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
-      </div>
-      <p className="register-key">
-        Tiles with a dark corner notch are above the early-alert line. The selected ward has a dark frame.
-      </p>
-    </div>
-  );
-}
-
 type SortKey = "cases" | "ward";
 const PREVIEW_ROWS = 12;
 
-function WardTable({
-  forecasts,
-  meta,
-  selectedWard,
-  onSelectWard,
-}: {
-  forecasts: Forecast[];
-  meta: Meta;
-  selectedWard: string;
-  onSelectWard: (id: string) => void;
-}) {
+function WardTable({ forecasts, meta, selectedWard, onSelectWard }: BodyProps) {
+  const { t, num, int, city: cityName, ward: wardName } = useI18n();
   const [query, setQuery] = useState("");
   const [city, setCity] = useState("all");
   const [sort, setSort] = useState<SortKey>("cases");
@@ -232,72 +157,71 @@ function WardTable({
     const list = forecasts.filter(
       (f) =>
         (city === "all" || f.city === city) &&
-        (q === "" || wardLabel(f.ward_id).toLowerCase().includes(q) || f.city.toLowerCase().includes(q)),
+        (q === "" ||
+          [wardName(f.ward_id), f.ward_id.replace(/_/g, " "), f.city, cityName(f.city)].some((s) => s.toLowerCase().includes(q))),
     );
     return [...list].sort((a, b) =>
       sort === "cases"
         ? b.predicted_cases_3wk - a.predicted_cases_3wk || a.ward_id.localeCompare(b.ward_id)
         : a.ward_id.localeCompare(b.ward_id),
     );
-  }, [forecasts, query, city, sort]);
+  }, [forecasts, query, city, sort, wardName, cityName]);
   const shown = expanded ? rows : rows.slice(0, PREVIEW_ROWS);
 
   return (
     <div className="ward-table">
       <div className="table-head">
-        <h3>Ward list</h3>
+        <h3>{t.listTitle}</h3>
         <div className="table-filters">
           <div className="field">
-            <label htmlFor="ward-search">Search wards</label>
+            <label htmlFor="ward-search">{t.search}</label>
             <input
               id="ward-search"
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="e.g. DNCC 12"
+              placeholder={t.searchPh}
               autoComplete="off"
             />
           </div>
           <div className="field">
-            <label htmlFor="list-city">City</label>
+            <label htmlFor="list-city">{t.listCity}</label>
             <select id="list-city" value={city} onChange={(e) => setCity(e.target.value)}>
-              <option value="all">All cities</option>
+              <option value="all">{t.allCities}</option>
               {meta.cities.map((c) => (
                 <option key={c.city} value={c.city}>
-                  {c.city}
+                  {cityName(c.city)}
                 </option>
               ))}
             </select>
           </div>
           <div className="field">
-            <label htmlFor="list-sort">Order by</label>
+            <label htmlFor="list-sort">{t.orderBy}</label>
             <select id="list-sort" value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
-              <option value="cases">Predicted cases, highest first</option>
-              <option value="ward">Ward name</option>
+              <option value="cases">{t.orderCases}</option>
+              <option value="ward">{t.orderWard}</option>
             </select>
           </div>
         </div>
       </div>
       <p className="table-count" role="status" aria-live="polite">
         {rows.length === forecasts.length
-          ? `Showing ${shown.length} of ${rows.length} wards`
-          : `Showing ${shown.length} of ${rows.length} matching ward${rows.length === 1 ? "" : "s"} (${forecasts.length} total)`}
+          ? t.showing(int(shown.length), int(rows.length))
+          : t.showingFiltered(int(shown.length), int(rows.length), int(forecasts.length), rows.length === 1)}
       </p>
       {rows.length === 0 ? (
-        <EmptyPanel title="No wards match" body="Clear the search or choose All cities." />
+        <EmptyPanel title={t.noMatchTitle} body={t.noMatchBody} />
       ) : (
         <table>
-          <caption className="sr-only">
-            Predicted combined dengue cases for weeks +2 to +4, by ward. Select a row to open its forecast.
-          </caption>
+          <caption className="sr-only">{t.tableCaption}</caption>
           <thead>
             <tr>
-              <th scope="col">Ward</th>
+              <th scope="col">{t.thWard}</th>
               <th scope="col" className="num">
-                Predicted cases
+                {t.thCases}
               </th>
-              <th scope="col">Risk tier</th>
-              <th scope="col">Early alert</th>
+              <th scope="col">{t.thTier}</th>
+              <th scope="col">{t.thAlert}</th>
             </tr>
           </thead>
           <tbody>
@@ -310,16 +234,22 @@ function WardTable({
                     aria-current={f.ward_id === selectedWard ? "true" : undefined}
                     onClick={() => onSelectWard(f.ward_id)}
                   >
-                    {wardLabel(f.ward_id)}
+                    {wardName(f.ward_id)}
                   </button>
-                  <span className="row-city">{f.city}</span>
-                  {f.early_alert && <span className="row-alert">Early alert raised</span>}
+                  <span className="row-city">{cityName(f.city)}</span>
+                  {f.early_alert && <span className="row-alert">{t.rowAlert}</span>}
                 </th>
-                <td className="num">{cases(f.predicted_cases_3wk)}</td>
+                <td className="num">{num(f.predicted_cases_3wk)}</td>
                 <td>
                   <TierChip tier={f.risk_tier} />
                 </td>
-                <td>{f.early_alert ? <strong className="alert-on">Raised</strong> : <span className="alert-off">Not raised</span>}</td>
+                <td>
+                  {f.early_alert ? (
+                    <strong className="alert-on">{t.alertRaised}</strong>
+                  ) : (
+                    <span className="alert-off">{t.alertNotRaised}</span>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -327,7 +257,7 @@ function WardTable({
       )}
       {rows.length > PREVIEW_ROWS && (
         <button type="button" className="btn btn-quiet" onClick={() => setExpanded((e) => !e)} aria-expanded={expanded}>
-          {expanded ? `Show top ${PREVIEW_ROWS} only` : `Show all ${rows.length} wards`}
+          {expanded ? t.showTop(int(PREVIEW_ROWS)) : t.showAll(int(rows.length))}
         </button>
       )}
     </div>
