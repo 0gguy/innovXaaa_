@@ -1,5 +1,14 @@
 """Backend settings. Plain defaults, optionally overridden by environment variables."""
 import os
+from pathlib import Path
+
+# <repo>/ml, resolved from this file so it works from any working directory.
+ML_DIR = Path(__file__).resolve().parents[2] / "ml"
+
+REPLAY_NOTICE = (
+    "Historical replay of a trained model on bundled data through 2025-12-29. "
+    "These are model estimates, not verified real-world warnings or live predictions."
+)
 
 APP_TITLE = "Dengue Ward Forecast API"
 APP_VERSION = "0.1.0"

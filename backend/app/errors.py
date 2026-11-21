@@ -23,6 +23,14 @@ _HTTP_MESSAGES = {
 }
 
 
+class ApiError(Exception):
+    """Expected, client-safe error raised by our own code (message is shown to the client)."""
+
+    def __init__(self, status: int, code: str, message: str):
+        super().__init__(code)
+        self.status, self.code, self.message = status, code, message
+
+
 def error_response(status: int, code: str, message: str, details=None, headers=None) -> JSONResponse:
     body: dict = {"code": code, "message": message}
     if details is not None:
@@ -31,6 +39,10 @@ def error_response(status: int, code: str, message: str, details=None, headers=N
 
 
 def register_error_handlers(app: FastAPI) -> None:
+    @app.exception_handler(ApiError)
+    async def api_error(request: Request, exc: ApiError):
+        return error_response(exc.status, exc.code, exc.message)
+
     @app.exception_handler(StarletteHTTPException)
     async def http_error(request: Request, exc: StarletteHTTPException):
         code = _HTTP_CODES.get(exc.status_code, f"http_{exc.status_code}")
