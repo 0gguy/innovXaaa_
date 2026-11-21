@@ -1,7 +1,0 @@
-predictor,test MAE,test RMSE
-XGBoost (final model),2.7762,4.9225
-Mean (dummy),9.5167,11.408
-Persistence: 3 x last week,7.2197,11.8451
-Persistence: 3 x 4-week mean,7.5684,11.6315
-Seasonal: week-of-year mean,3.6719,6.479
-Seasonal: ward x week-of-year mean,3.2232,5.8108
