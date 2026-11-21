@@ -1,0 +1,37 @@
+# Python virtual environments
+.venv/
+venv/
+env/
+*-venv/
+*_venv/
+
+# Python bytecode and caches
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
+
+# Secrets / local environment (never commit)
+.env
+.env.*
+
+# Editor and OS temporary files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Local diagnostic / temporary output
+*.log
+*.tmp
