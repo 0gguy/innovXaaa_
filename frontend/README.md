@@ -18,8 +18,10 @@ cd frontend          # from the repository root
 npm install
 ```
 
-After install the app needs no internet: fonts are bundled from npm packages (no external
-fonts, images, map tiles or analytics).
+After install the app needs no internet: the Latin fonts are bundled from npm packages and the hero
+image is a local file (`public/images/dengue-hero-bg.webp`); there are no external fonts, images,
+map tiles or analytics. Bangla text uses a font already installed on the device (for example Nirmala UI
+on Windows); no Bangla font file is bundled yet, so its appearance can vary between devices.
 
 ## Start everything
 
@@ -51,7 +53,7 @@ via `DENGUE_CORS_ORIGINS`).
 | `npm run dev` | Vite dev server on 127.0.0.1:5173 |
 | `npm run typecheck` | Strict TypeScript check |
 | `npm run lint` | ESLint |
-| `npm test` | Vitest + Testing Library (offline, API faked) |
+| `npm test` | Vitest + Testing Library (offline, API faked); 67 tests in 3 files for the redesigned frontend |
 | `npm run build` | Typecheck and production build into `dist/` |
 | `npm run preview` | Serve the production build on 127.0.0.1:5173 |
 
@@ -61,22 +63,57 @@ On Windows, run the commands from PowerShell using the normal drive-letter path 
 
 ## What the dashboard shows
 
-- **Header:** product identity, a "Historical replay" badge, the selected issue week, and
-  the backend's own limitation notice.
+- **Header:** product identity, an **English | বাংলা** switch, the selected issue week, and the "Not a live
+  warning system" historical-replay notice. A subtle AI-generated illustration sits behind the header (see
+  "Hero image" below).
 - **Selectors:** city corporation, ward (filtered by city) and issue week, all populated
   from `GET /meta`. Only Mondays between the first and last valid week are offered.
-- **Ward forecast:** predicted combined cases, risk tier (colour, letter and word), early
-  alert (raised when predicted combined cases are above the threshold from `/meta`, 25),
-  the forecast window, and the **observed later (historical comparison)** outcome when
-  the data has one. Observed values are never model inputs.
-- **What shaped this estimate:** the model's own attribution groups (rainfall, humidity,
-  temperature, recent cases, ward vulnerability, season, identity) from the API, shown as
-  diverging bars. They describe how the model reached its number, not causes of dengue.
-- **All-ward overview:** wards per risk tier, a per-city breakdown, a non-geographic
-  **ward register** (one tile per ward), and a searchable, filterable list ordered by
-  predicted cases. Selecting a ward anywhere updates the detail panel.
-- **Methodology and limits:** what the model is, the data window, provisional tiers, and
-  the documented false-alarm and bias limitations.
+- **Ward forecast card:** the estimated combined cases for weeks +2 to +4 (one total, never three weekly values),
+  the weeks it covers, the risk tier (colour, letter and word) on a four-band scale with its boundaries, and the
+  early alert (raised when the estimate is above the threshold from `/meta`, 25). The model estimate is shown beside
+  the **observed later (historical comparison)** value, with the difference, when the data has one. Observed values
+  are never model inputs.
+- **What shaped this estimate:** the model's own attribution groups from the API, split into groups that pushed the
+  estimate up and groups that pulled it down (largest first, signs and values unchanged), each with a one-line
+  plain-language description, and a collapsed technical-detail box. They describe how the model reached its number,
+  not causes of dengue.
+- **Five city-wise ward bar charts:** one chart per city corporation (10, 20, 20, 5 and 5 wards, 60 bars in total).
+  The X axis is the ward number; the Y axis is the predicted combined cases for the selected issue week, on one scale
+  shared by all five charts. Bars use the API's risk tier colours with a worded legend, early-alert wards get a bell
+  and a dashed line marks the alert threshold. Hover or keyboard focus shows a tooltip (ward, cases, tier, alert);
+  clicking a bar selects that ward. The selected bar is outlined with a dark label so it does not depend on colour
+  alone. On narrow screens the 20-ward charts scroll sideways instead of shrinking the labels. The charts are
+  **not a map**: bar order has no geographic meaning.
+- **All-ward summary and list:** wards per risk tier, a per-city breakdown, and the searchable, sortable ward list
+  below the charts. Selecting a ward anywhere updates the forecast card.
+- **Methodology and limits:** four short blocks (how the model works, understanding the forecast, risk tiers and
+  the early alert, accuracy and limits) with expandable technical detail. The false-alert counts, the lack of
+  prediction intervals, the uncertain data provenance and the non-causal nature of TreeSHAP stay visible.
+
+## Language
+
+The switch in the header changes every user-facing string between English and Bangla (labels, tooltips,
+tier names, errors, the methodology and screen-reader text). Translations live in `src/i18n/dict.ts` (one typed
+dictionary per language) and are applied by `src/i18n/I18n.tsx`. Switching does not reload the page, keeps the
+selected city, ward, week and search text, and makes no new API requests; the choice is remembered in the browser.
+Numbers and dates are shown with Bangla digits and month names in Bangla; ward ids and API values are unchanged.
+The Bangla wording has not been reviewed by a native speaker. Backend-written messages (for example a model-input
+warning) are English only and stay in English inside the Bangla page.
+
+## Hero image
+
+`public/images/dengue-hero-bg.webp` is an illustrative, **AI-generated** background (made with OpenAI ChatGPT image
+generation; the prompt was not recorded) shown at 55% opacity over the deep teal, which is also the fallback if the image does not load. It is not
+a photograph of a real outbreak, and no photographic source or licence is claimed. The unoptimised original is kept as
+`frontend/heropic.png` and is not used by the app.
+
+## Tests
+
+`npm test` runs 67 tests in 3 files (the API client and validation, the original dashboard behaviour, and
+`src/redesign.test.tsx` for the forecast card, the five charts, the methodology and the English/Bangla switch).
+The redesigned frontend passed all 67, with `typecheck`, `lint` and `build` also passing (verified before the redesign was committed). The
+earlier published frontend had 34 tests. The 61.2-second fresh-clone timing in the root README was measured on that
+earlier frontend, not on this redesign.
 
 ## How it talks to the backend
 
@@ -92,4 +129,4 @@ errors with Retry, and empty results.
 
 ## Not included
 
-No authentication, database, live data, notifications, map or hosted services.
+No authentication, database, live data, notifications, map, hosted services or bundled Bangla font file.

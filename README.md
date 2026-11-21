@@ -86,7 +86,9 @@ one run on one machine and network; other machines may be slower, and the depend
 separate **warm start** with dependencies already installed took 2.9 seconds; it is not a setup time. The
 test checked out application commit `922f1b8` and used the setup instructions from the root README that was
 committed afterwards. The documentation itself was not part of that tested checkout, and the commit that adds it
-was not itself cloned and tested.
+was not itself cloned and tested. The later frontend redesign described in section 3 (ward charts, English/Bangla
+switch, hero image, redesigned forecast card and methodology) came after that test and was **not** included in the
+61.2-second measurement.
 
 ## 3. Features
 
@@ -97,11 +99,31 @@ All of the following are implemented and covered by the tests described in secti
 - **Trained XGBoost regression model** with dynamic inference for any ward and historical issue week.
 - **Four risk tiers** (Low, Medium, High, Critical) and an **early alert** (predicted combined cases > 25).
 - **FastAPI backend** with four read-only endpoints and consistent JSON errors.
-- **React + TypeScript dashboard:** city, ward and issue-week selectors; ward forecast detail; the observed
-  outcome shown separately as a historical comparison; driver bars; an all-ward overview with tier counts,
-  a per-city breakdown and a searchable ward list.
-- **Ward register:** one tile per ward, grouped by city. It is a non-geographic layout, **not a map**; no
-  ward coordinates or boundaries exist in the data.
+- **React + TypeScript dashboard:** city, ward and issue-week selectors; a ward forecast card that leads with the
+  estimated combined cases, the risk tier on a four-band scale and the early-alert status; the observed outcome
+  shown beside the forecast as a historical comparison; and plain-language "what shaped this estimate" contributions
+  (TreeSHAP groups that raised or lowered the estimate, with a collapsed technical-detail box and a note that they
+  are attributions, not causes).
+- **Five city-wise ward bar charts:** one chart per city corporation (Chattogram 10 wards, Dhaka North 20, Dhaka
+  South 20, Gazipur 5, Narayanganj 5; 60 bars in total). Each bar is one ward: the X axis is the ward number and the
+  Y axis is the predicted combined dengue cases for weeks +2 to +4 for the selected issue week, on one shared scale
+  so cities can be compared. Bars are coloured by the backend's risk tier, early-alert wards carry a bell and a
+  dashed line marks the alert threshold. Hovering or focusing a bar shows its ward, cases, tier and alert status;
+  clicking it opens that ward's forecast. The selected ward has an outlined bar and a dark label, and the 20-ward
+  charts scroll sideways on narrow screens. Below the charts, the all-ward summary, a per-city breakdown and a
+  searchable, sortable ward list remain. The charts are **not a map**: no ward coordinates or boundaries exist in the
+  data, and bar order has no geographic meaning.
+- **English | বাংলা switch:** the whole interface can be switched between English and Bangla without reloading;
+  the selected city, ward and week are kept and no new API requests are made. Bangla text uses a font already
+  installed on the device (no Bangla font file is bundled yet), and the Bangla wording has not been reviewed by a
+  native speaker.
+- **Methodology and limits section:** four short blocks (how the model works, understanding the forecast, risk tiers
+  and the early alert, accuracy and limits) with expandable technical detail. It keeps the false-alert counts, the
+  absence of prediction intervals, the uncertain data provenance and the non-causal nature of TreeSHAP visible.
+- **Hero background:** a subtle, locally bundled, AI-generated illustration (`frontend/public/images/dengue-hero-bg.webp`)
+  behind the header at 55% opacity over the deep teal, which remains the fallback. It is an illustrative visual,
+  not a photograph of a real outbreak (see section 10). The "Not a live warning system" historical-replay notice
+  stays in the header.
 - **Windows-compatible portable model loading** (`ml/predict_portable.py`) with SHA-256 artifact checks.
 - Handled UI states: loading, backend unreachable, model unavailable, per-request errors with retry, and
   stale-response protection when selections change quickly.
@@ -219,7 +241,7 @@ cd ..
 # Portable ML package (48 tests, from the repository root)
 python -m pytest ml\tests\test_portable_api.py ml\tests\test_portable_equivalence.py -q
 
-# Frontend (34 tests), type checking, linting and production build
+# Frontend (67 tests for the redesigned frontend), type checking, linting and production build
 cd frontend
 npm test
 npm run typecheck
@@ -231,11 +253,14 @@ npm run build
 | --- | --- |
 | Backend | 36 passed |
 | Portable ML | 48 passed |
-| Frontend | 34 passed; `typecheck` and `lint` exit 0; `build` succeeded |
+| Frontend, published baseline (commit `922f1b8`) | 34 passed; `typecheck` and `lint` exit 0; `build` succeeded |
+| Frontend, redesigned (local commit `5a58555`) | 67 passed in 3 test files; `typecheck` and `lint` exit 0; `build` succeeded (verified on the redesigned code before that commit was created) |
 
-The same suites were run again in the fresh clone described in section 2 (backend 36 passed, portable ML 48
-passed, frontend 34 passed; `typecheck`, `lint` and `build` succeeded), without the legacy ML test file. A real-browser
-check in that clone confirmed the Historical replay labelling, five cities and 60 wards, the DNCC Ward 12 forecast
+The same suites were run again in the fresh clone described in section 2, which contained the earlier frontend
+(backend 36 passed, portable ML 48 passed, frontend 34 passed; `typecheck`, `lint` and `build` succeeded), without
+the legacy ML test file. The 67-test frontend result comes from the later redesign and was not part of that fresh
+clone. A real-browser
+check in that clone, on the earlier frontend, confirmed the Historical replay labelling, five cities and 60 wards, the DNCC Ward 12 forecast
 (Critical tier, early alert raised) with its driver breakdown for 28 Jul 2025, and no console errors. These are the
 project's own checks, not independent certification.
 
@@ -281,6 +306,7 @@ AI assistants were used during development. They are **not** part of the running
 | **AI-assisted analysis and modeling workflow** (Claude) | Dataset analysis, the XGBoost modeling workflow, model evaluation and model documentation, as stated by the team. The exact tool versions for these earlier sessions were not recorded in the repository. |
 | Claude Code skills: `frontend-design`, `impeccable`, `unslop` | Written design guidance loaded into Claude Code, plus a local design-lint check (`impeccable`). They are instructions and tooling, not separate AI models or external APIs. |
 | Playwright CLI | Local browser-automation tool used by Claude Code for browser testing. It is not an AI model. |
+| **OpenAI ChatGPT image generation** (prompt not recorded in the repository) | The hero background image `frontend/public/images/dengue-hero-bg.webp`. It is an illustrative, AI-generated visual, **not a photograph** of a real event or outbreak, and no photographic source or image licence is claimed for it. |
 
 **Runtime external APIs: none.** The running application makes no calls to AI services, weather services or
 other hosted APIs. The organizer's dataset (a Google Sheet linked in the brief) was obtained during
@@ -329,13 +355,13 @@ instructions for how to submit.
 
 **Status of submission items:** this README, the AI disclosure and [`ARCHITECTURE.md`](ARCHITECTURE.md) are
 written. The demo video is **not yet recorded**. A fresh-clone launch check of the published
-application code was run once (section 2): 61.2 seconds to readiness on one machine, below the 3-minute target.
-No bonus extension (confidence intervals, a geographic heat map or a validation-error dashboard) is claimed;
-the ward register is not a map.
+application code (the earlier frontend, before the redesign) was run once (section 2): 61.2 seconds to readiness
+on one machine, below the 3-minute target. No bonus extension (confidence intervals, a geographic heat map or a
+validation-error dashboard) is claimed; the ward bar charts are not a map.
 
 To demo: follow the Quick start, then walk through selecting a city, ward and issue week; the ward forecast,
-tier, early alert and driver bars; the observed-outcome comparison; the all-ward overview and register; and the
-limitations section.
+tier, early alert and the contributions that shaped the estimate; the observed-outcome comparison; the five city
+bar charts and the ward list; the English/Bangla switch; and the limitations section.
 
 ## 13. Limitations
 
