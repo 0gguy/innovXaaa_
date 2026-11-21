@@ -1,0 +1,13 @@
+model,alert if predicted >,precision,recall,F1
+XGBoost,15,0.4489,1.0,0.6197
+XGBoost,20,0.5725,0.9709,0.7203
+XGBoost,25,0.7216,0.8571,0.7836
+XGBoost,30,0.8464,0.6561,0.7392
+XGBoost,35,0.9121,0.4392,0.5929
+XGBoost,40,0.9519,0.2619,0.4108
+Hist Gradient Boosting (mislabelled in original),15,0.442,0.9974,0.6125
+Hist Gradient Boosting (mislabelled in original),20,0.5865,0.9683,0.7305
+Hist Gradient Boosting (mislabelled in original),25,0.765,0.8439,0.8025
+Hist Gradient Boosting (mislabelled in original),30,0.8657,0.6481,0.7413
+Hist Gradient Boosting (mislabelled in original),35,0.9348,0.455,0.6121
+Hist Gradient Boosting (mislabelled in original),40,0.9735,0.291,0.4481
