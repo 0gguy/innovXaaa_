@@ -33,9 +33,8 @@ officers; because the data are historical, the application demonstrates the meth
 
 **Verified with Python 3.13.1 and Node.js 24 (npm 11) on Windows 10.** Other versions were not tested.
 The application needs no internet access, API keys, database or model download once dependencies are
-installed. These commands mirror the ones used in the project's working copy (where the virtual environment
-was kept outside the repository). A from-scratch clone test and a timed install have not been run yet, so the
-installation time is not claimed.
+installed; installing the dependencies itself needs internet access for any package that is not cached. A
+fresh-clone check of these commands is recorded below.
 
 ```powershell
 # 1. Get the code
@@ -76,6 +75,18 @@ Open **<http://127.0.0.1:5173>**. The default view is Dhaka North, DNCC Ward 12,
 Dependency files: [`backend/requirements.txt`](backend/requirements.txt),
 [`ml/requirements.txt`](ml/requirements.txt) and [`frontend/package.json`](frontend/package.json) with
 [`frontend/package-lock.json`](frontend/package-lock.json). All versions are pinned.
+
+**Fresh-clone verification (22 November 2026).** On Windows 10 with Python 3.13.1 and Node.js 24.11.1, the
+commands above were applied to a new clone of the published GitHub commit `922f1b8` in a temporary folder, with a new
+virtual environment and empty pip and npm caches (the venv's `python.exe` was called directly instead of
+`Activate.ps1`). No source files were edited. The full fresh setup, measured from just before `git clone` until
+`/health` reported `model_ready: true` and the dashboard server answered, took **61.2 seconds** (clone 6 s,
+virtual environment 4 s, `pip install` 40 s, `npm install` 8 s), below the brief's 180-second target. This is
+one run on one machine and network; other machines may be slower, and the dependency downloads need internet. A
+separate **warm start** with dependencies already installed took 2.9 seconds; it is not a setup time. The
+test checked out application commit `922f1b8` and used the setup instructions from the root README that was
+committed afterwards. The documentation itself was not part of that tested checkout, and the commit that adds it
+was not itself cloned and tested.
 
 ## 3. Features
 
@@ -220,7 +231,13 @@ npm run build
 | --- | --- |
 | Backend | 36 passed |
 | Portable ML | 48 passed |
-| Frontend | 34 passed; `typecheck` and `lint` exit 0; `build` succeeded in earlier runs |
+| Frontend | 34 passed; `typecheck` and `lint` exit 0; `build` succeeded |
+
+The same suites were run again in the fresh clone described in section 2 (backend 36 passed, portable ML 48
+passed, frontend 34 passed; `typecheck`, `lint` and `build` succeeded), without the legacy ML test file. A real-browser
+check in that clone confirmed the Historical replay labelling, five cities and 60 wards, the DNCC Ward 12 forecast
+(Critical tier, early alert raised) with its driver breakdown for 28 Jul 2025, and no console errors. These are the
+project's own checks, not independent certification.
 
 **Known failing on Windows:** `ml/tests/test_package.py` tests the original `predict.py` loader, which
 deserializes a combined scikit-learn/XGBoost joblib file that fails on this Windows setup (`XGBoostError: input
@@ -309,8 +326,8 @@ The brief's "Submission Link" field is blank in the copy the team received; foll
 instructions for how to submit.
 
 **Status of submission items:** this README, the AI disclosure and [`ARCHITECTURE.md`](ARCHITECTURE.md) are
-written. The demo video is **not yet recorded**. A from-scratch clone-and-launch check has **not yet been
-performed**.
+written. The demo video is **not yet recorded**. A fresh-clone launch check of the published
+application code was run once (section 2): 61.2 seconds to readiness on one machine, below the 3-minute target.
 No bonus extension (confidence intervals, a geographic heat map or a validation-error dashboard) is claimed;
 the ward register is not a map.
 
