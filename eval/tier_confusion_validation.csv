@@ -1,0 +1,5 @@
+actual tier,Low,Medium,High,Critical
+Low,3109,104,12,0
+Medium,130,126,82,0
+High,0,55,346,38
+Critical,0,0,139,239
