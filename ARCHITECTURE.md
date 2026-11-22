@@ -44,7 +44,8 @@ flowchart LR
 
 - **Chronological split, never random,** with a **4-week purge** before each cutoff: train 2016-02-01 to 2022-11-21
   (21,360 rows), validation 2022-12-26 to 2024-05-13 (4,380), test 2024-06-17 to 2025-12-01 (4,620). The final model is
-  refitted on train plus validation and scored once on test.
+  refitted on train plus validation. Model and alert-threshold selection used validation; the later test period is the
+  primary reported evaluation, and the saved artifacts do not establish how many times it was evaluated.
 - **Why XGBoost:** lowest validation MAE (2.137, against 2.200 to 2.514 for Hist Gradient Boosting, Extra Trees and Random
   Forest) and exact TreeSHAP attributions. Leakage checks: [`ml/model_report.md`](ml/model_report.md).
 - **Test** (4,620 ward-weeks, clipped as served): MAE 2.776, RMSE 4.922, R-squared 0.813; seasonal baseline MAE 3.223

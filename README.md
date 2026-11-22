@@ -87,8 +87,8 @@ separate **warm start** with dependencies already installed took 2.9 seconds; it
 test checked out application commit `922f1b8` and used the setup instructions from the root README that was
 committed afterwards. The documentation itself was not part of that tested checkout, and the commit that adds it
 was not itself cloned and tested. The later frontend redesign described in section 3 (ward charts, English/Bangla
-switch, hero image, redesigned forecast card and methodology) came after that test and was **not** included in the
-61.2-second measurement.
+switch, hero image, redesigned forecast card and methodology) and the chronological validation dashboard (section 6)
+came after that test and were **not** included in the 61.2-second measurement.
 
 ## 3. Features
 
@@ -117,6 +117,10 @@ All of the following are implemented and covered by the tests described in secti
   the selected city, ward and week are kept and no new API requests are made. Bangla text uses a font already
   installed on the device (no Bangla font file is bundled yet), and the Bangla wording has not been reviewed by a
   native speaker.
+- **Chronological validation dashboard:** a section that charts the saved weekly forecast errors (MAE or RMSE) of
+  the model over the held-out Test weeks or the Validation weeks, with pooled reference values, a keyboard-operable
+  chart, a table alternative and a separate yearly rolling-origin panel. It reads a static local JSON file, not the
+  backend, and is described in section 6.
 - **Methodology and limits section:** four short blocks (how the model works, understanding the forecast, risk tiers
   and the early alert, accuracy and limits) with expandable technical detail. It keeps the false-alert counts, the
   absence of prediction intervals, the uncertain data provenance and the non-causal nature of TreeSHAP visible.
@@ -144,7 +148,9 @@ React dashboard (frontend/src)             http://127.0.0.1:5173
 ```
 
 At backend startup the portable forecaster is loaded once, builds the feature table from the bundled CSV,
-and then serves every request from memory. The browser only calls the local backend.
+and then serves every request from memory. The browser only calls the local backend, plus one static file served
+with the frontend (`frontend/public/validation/weekly_errors.json`) for the validation dashboard (section 6); there
+is no extra backend endpoint for it.
 A fuller write-up (Mermaid diagram, validation split, model-selection rationale and cost controls) is in
 [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
@@ -169,7 +175,9 @@ Details and checks are in [`ml/model_report.md`](ml/model_report.md).
   | Validation | 2022-12-26 to 2024-05-13 | 4,380 |
   | Test | 2024-06-17 to 2025-12-01 | 4,620 |
 
-  The final model is refitted on train plus validation (25,740 rows) and evaluated once on the test period.
+  The final model is refitted on train plus validation (25,740 rows). The later test period is kept separate from
+  model and alert-threshold selection (which used validation) and is the primary reported evaluation. The saved
+  artifacts do not independently establish how many times the test set was evaluated.
 - **Model selection (validation MAE):** XGBoost 2.137, Hist Gradient Boosting 2.200, Extra Trees 2.250,
   Random Forest 2.514, mean baseline 10.202.
 - **Risk tiers** on the predicted combined total *p* (clipped at 0): Low `p < 4.5`; Medium `4.5 <= p < 14.5`;
@@ -208,6 +216,55 @@ September (+3.5) in the test period; it tends to under-forecast the largest outb
 tier; and error varies by city (MAE 2.59 for Narayanganj to 3.23 for Gazipur) and by year. No confidence
 intervals are reported or claimed.
 
+### Chronological validation dashboard
+
+The dashboard's "How the model performed on held-out weeks" section shows how far the model's forecasts were from
+what was recorded, week by week, in time order. It is built from the **saved evaluation predictions** in
+`ml/eval/`. It runs no new inference and uses no live surveillance data.
+
+- **What each bar is.** One bar per **issue week**: the error across that week's **60 ward predictions**. The
+  target is the combined dengue cases for weeks t+2, t+3 and t+4, so errors are in cases, **not percentages**.
+- **Controls.** *Test (held out)* or *Validation* chooses the period; *MAE* or *RMSE* chooses the measure. Test is
+  the default. A dashed reference line and the headline figures show the **pooled** MAE and RMSE over every
+  prediction in the chosen period. Pooled RMSE is **not** the average of the weekly RMSE values. A table gives the
+  same weekly values as text, and the chart can be stepped through with the arrow keys.
+- **Rolling-origin panel.** A separately labelled yearly table (2020 to 2025) comes from a different scheme in
+  which the model is retrained each year. It is never mixed with the Validation or Test figures.
+- **English and Bangla.** The section is available in both languages (Bangla wording not reviewed by a native
+  speaker).
+
+| Period | Issue weeks | Predictions | Pooled MAE | Pooled RMSE | Model used |
+| --- | --- | --- | --- | --- | --- |
+| Validation | 73 (2022-12-26 to 2024-05-13) | 4,380 | 2.1371 | 4.3730 | Trained on the training period only |
+| Test | 77 (2024-06-17 to 2025-12-01) | 4,620 | 2.7762 | 4.9225 | Refitted on train plus validation (per `ml/model_report.md`) |
+
+Values are in combined cases per ward-week and were recomputed from the saved predictions, which hold the
+clipped, as-served values rounded to four decimal places. The generator checks them against
+`ml/eval/metrics_summary.json`.
+
+**How to read it.**
+
+- The validation weeks also helped choose the model and the alert threshold, so Validation results may be
+  **optimistic**. The later held-out Test period is the primary performance evidence.
+- The data appear to be simulated (section 13), so the dashboard does not establish real-world accuracy.
+- It has no prediction intervals, is not a live outbreak warning and does not promise future accuracy. It shows
+  when errors occurred, not why.
+
+**Regenerating the data.** The chart reads the committed file `frontend/public/validation/weekly_errors.json`.
+It is produced by a standard-library Python script (no packages to install, no model is loaded or retrained) that
+reads only the existing CSV and JSON files in `ml/eval/`. Run from the repository root:
+
+```powershell
+python ml/tools/export_validation_errors.py            # regenerate and overwrite the JSON
+python ml/tools/export_validation_errors.py --check    # read-only: confirm the committed JSON is up to date
+```
+
+`--check` writes nothing and fails with a message if the file is missing or differs from a fresh export. The
+script also stops with an error if a saved file breaks one of its checks (row counts, week dates, 60 identical
+wards in every week, the validation model label, or a pooled metric that disagrees with `metrics_summary.json`).
+The `ml/eval` files must stay unchanged. The page additionally validates the JSON in the browser and shows a safe
+"not available" message if it is malformed.
+
 ## 7. API endpoints
 
 All endpoints are read-only `GET` requests. Responses carry `"mode": "historical_replay"` and a limitation
@@ -241,12 +298,17 @@ cd ..
 # Portable ML package (48 tests, from the repository root)
 python -m pytest ml\tests\test_portable_api.py ml\tests\test_portable_equivalence.py -q
 
-# Frontend (67 tests for the redesigned frontend), type checking, linting and production build
+# Frontend (112 tests with the validation dashboard), type checking, linting and production build
 cd frontend
 npm test
 npm run typecheck
 npm run lint
 npm run build
+cd ..
+
+# Validation-dashboard exporter (12 tests, from the repository root) and its read-only freshness check
+python -m pytest ml/tools/tests -q -p no:cacheprovider
+python ml/tools/export_validation_errors.py --check
 ```
 
 | Suite | Observed result |
@@ -255,11 +317,15 @@ npm run build
 | Portable ML | 48 passed |
 | Frontend, published baseline (commit `922f1b8`) | 34 passed; `typecheck` and `lint` exit 0; `build` succeeded |
 | Frontend, redesigned (local commit `5a58555`) | 67 passed in 3 test files; `typecheck` and `lint` exit 0; `build` succeeded (verified on the redesigned code before that commit was created) |
+| Frontend, redesigned with the validation dashboard (local commit `ba34cac`) | 112 passed in 3 test files; `typecheck`, `lint` and `build` succeeded (re-run before that commit was created) |
+| Validation-dashboard exporter (latest audit) | 12 passed; `--check` reported the JSON up to date |
 
 The same suites were run again in the fresh clone described in section 2, which contained the earlier frontend
 (backend 36 passed, portable ML 48 passed, frontend 34 passed; `typecheck`, `lint` and `build` succeeded), without
-the legacy ML test file. The 67-test frontend result comes from the later redesign and was not part of that fresh
-clone. A real-browser
+the legacy ML test file. The 67-test and 112-test frontend results come from later code and were not part of that
+fresh clone. The 112-test frontend result (with `typecheck`, `lint` and `build`) was re-run before commit `ba34cac`
+was created; no tests were run again for this documentation update (only the exporter `--check` was). The
+12 exporter tests are the result of the latest audit. A real-browser
 check in that clone, on the earlier frontend, confirmed the Historical replay labelling, five cities and 60 wards, the DNCC Ward 12 forecast
 (Critical tier, early alert raised) with its driver breakdown for 28 Jul 2025, and no console errors. These are the
 project's own checks, not independent certification.
@@ -356,12 +422,14 @@ instructions for how to submit.
 **Status of submission items:** this README, the AI disclosure and [`ARCHITECTURE.md`](ARCHITECTURE.md) are
 written. The demo video is **not yet recorded**. A fresh-clone launch check of the published
 application code (the earlier frontend, before the redesign) was run once (section 2): 61.2 seconds to readiness
-on one machine, below the 3-minute target. No bonus extension (confidence intervals, a geographic heat map or a
-validation-error dashboard) is claimed; the ward bar charts are not a map.
+on one machine, below the 3-minute target. No bonus extension is claimed for confidence intervals or a geographic
+heat map; the ward bar charts are not a map. The chronological validation dashboard (section 6) is an
+evaluation view of saved predictions, not a claim of verified real-world accuracy.
 
 To demo: follow the Quick start, then walk through selecting a city, ward and issue week; the ward forecast,
 tier, early alert and the contributions that shaped the estimate; the observed-outcome comparison; the five city
-bar charts and the ward list; the English/Bangla switch; and the limitations section.
+bar charts and the ward list; the English/Bangla switch; the validation dashboard (Test and Validation, MAE and
+RMSE); and the limitations section.
 
 ## 13. Limitations
 
@@ -375,6 +443,9 @@ bar charts and the ward list; the English/Bangla switch; and the limitations sec
 - **Model uncertainty.** The alert has low precision on the test period (many false alerts), the model
   under-forecasts the largest outbreaks, and it is biased high in June and September. There are no
   confidence intervals.
+- **Validation figures may be optimistic.** The validation period helped choose the model and the alert
+  threshold; the held-out test period is the primary evidence. The validation dashboard shows saved historical
+  errors only.
 - **No official warnings.** Outputs need review by public-health professionals before any use.
 - **Driver bars are attributions, not causes.** They show how the model reached a number.
 

@@ -53,7 +53,7 @@ via `DENGUE_CORS_ORIGINS`).
 | `npm run dev` | Vite dev server on 127.0.0.1:5173 |
 | `npm run typecheck` | Strict TypeScript check |
 | `npm run lint` | ESLint |
-| `npm test` | Vitest + Testing Library (offline, API faked); 67 tests in 3 files for the redesigned frontend |
+| `npm test` | Vitest + Testing Library (offline, API faked); 112 tests in 3 files, including the validation dashboard |
 | `npm run build` | Typecheck and production build into `dist/` |
 | `npm run preview` | Serve the production build on 127.0.0.1:5173 |
 
@@ -86,6 +86,22 @@ On Windows, run the commands from PowerShell using the normal drive-letter path 
   **not a map**: bar order has no geographic meaning.
 - **All-ward summary and list:** wards per risk tier, a per-city breakdown, and the searchable, sortable ward list
   below the charts. Selecting a ward anywhere updates the forecast card.
+- **Chronological validation dashboard** ("How the model performed on held-out weeks", above the methodology):
+  - A **Test (held out) / Validation** selector (Test is the default) and a **MAE / RMSE** switch.
+  - A **weekly error chart**: one bar per issue week in time order, each the error across that week's 60 ward
+    predictions, in combined cases (not percentages). The chart is keyboard-operable (arrow keys, Home, End) and
+    its selected-week marker does not rely on colour alone.
+  - **Pooled reference metrics** for the chosen period (headline figures plus a dashed reference line). Pooled RMSE
+    is not the mean of the weekly RMSE values.
+  - An **accessible weekly-value table**, in a collapsed "Show the weekly values as a table" block.
+  - A separately labelled **yearly rolling-origin panel** (2020 to 2025), from a different training scheme and never
+    mixed with the Validation or Test figures.
+  - English and Bangla text (the Bangla wording is not natively reviewed).
+  - On the Validation split, a note that validation also helped choose the model and the alert threshold, so
+    results may be optimistic; the held-out Test period is the primary evidence.
+
+  It shows saved historical evaluation errors only. It performs no live validation, inference or training, the
+  data appear to be simulated, and there are no prediction intervals, so it does not demonstrate real-world accuracy.
 - **Methodology and limits:** four short blocks (how the model works, understanding the forecast, risk tiers and
   the early alert, accuracy and limits) with expandable technical detail. The false-alert counts, the lack of
   prediction intervals, the uncertain data provenance and the non-causal nature of TreeSHAP stay visible.
@@ -107,17 +123,40 @@ generation; the prompt was not recorded) shown at 55% opacity over the deep teal
 a photograph of a real outbreak, and no photographic source or licence is claimed. The unoptimised original is kept as
 `frontend/heropic.png` and is not used by the app.
 
+## Validation data file
+
+The validation dashboard reads one static, locally served file, `public/validation/weekly_errors.json`
+(fetched from `validation/weekly_errors.json` under the app's base URL). It is **not** produced by the backend and
+there is no new API endpoint. It is generated from the existing saved evaluation predictions in `../ml/eval/` by
+`../ml/tools/export_validation_errors.py`, which recomputes the weekly and pooled MAE and RMSE; no model is loaded or
+retrained. From the repository root:
+
+```powershell
+python ml/tools/export_validation_errors.py            # regenerate and overwrite the JSON
+python ml/tools/export_validation_errors.py --check    # read-only: confirm the committed JSON is up to date
+```
+
+The page checks the file before using it (schema version, Monday dates in order, first and last weeks, prediction
+counts, target offsets of 14, 21 and 28 days, and finite non-negative metrics). If the file is missing or fails
+a check, the section shows a "The saved evaluation data is not available" message instead of partial charts. The files in
+`../ml/eval/` must stay unchanged. See "Chronological validation dashboard" in the [root README](../README.md) for
+the evaluated periods and pooled values.
+
 ## Tests
 
-`npm test` runs 67 tests in 3 files (the API client and validation, the original dashboard behaviour, and
-`src/redesign.test.tsx` for the forecast card, the five charts, the methodology and the English/Bangla switch).
-The redesigned frontend passed all 67, with `typecheck`, `lint` and `build` also passing (verified before the redesign was committed). The
-earlier published frontend had 34 tests. The 61.2-second fresh-clone timing in the root README was measured on that
-earlier frontend, not on this redesign.
+`npm test` runs 112 tests in 3 files (the API client and validation, the original dashboard behaviour, and
+`src/redesign.test.tsx` for the forecast card, the five charts, the methodology, the English/Bangla switch and the
+validation dashboard, including its malformed-data checks). For the redesigned frontend with the validation dashboard (local commit `ba34cac`), all 112 passed,
+with `typecheck`, `lint` and `build` also passing; these were re-run before that commit was created and not again for this documentation update. The
+exporter has its own 12 tests (`python -m pytest ml/tools/tests -q -p no:cacheprovider` from the repository root).
+Earlier milestones: the published frontend had 34 tests and the redesign had 67 (verified before it was committed).
+The 61.2-second fresh-clone timing in the root README was measured on the earlier 34-test frontend (commit `922f1b8`),
+not on the redesign or the validation dashboard.
 
 ## How it talks to the backend
 
-Read-only `GET` requests only: `/meta`, `/forecast/{ward_id}` and `/forecast`. Responses
+Read-only `GET` requests only: `/meta`, `/forecast/{ward_id}` and `/forecast` (plus the static validation file
+described above, which is served by the frontend itself, not the backend). Responses
 are checked at runtime (`src/api/validate.ts`); a malformed response shows an error
 instead of partial data. Requests time out after 15 s. Risk tiers, alerts and all
 forecast numbers are taken from the API unchanged; the frontend does no classification.

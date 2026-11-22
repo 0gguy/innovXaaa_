@@ -44,7 +44,7 @@ Checks performed in the notebook:
 | Validation | 2022-12-26 – 2024-05-13 | 4,380 |
 | Test | 2024-06-17 – 2025-12-01 | 4,620 |
 
-Cutoffs fall at 70% and 85% of the weekly dates. A 4-week purge before each cutoff stops any target window crossing into the next period. The final model is refitted on train + validation (25,740 rows) and evaluated once on the test period.
+Cutoffs fall at 70% and 85% of the weekly dates. A 4-week purge before each cutoff stops any target window crossing into the next period. The final model is refitted on train + validation (25,740 rows). Model and alert-threshold selection used validation; the later held-out test period provides the primary reported evaluation. The saved artifacts do not independently establish how many times it was evaluated.
 
 ## 5. Model
 
