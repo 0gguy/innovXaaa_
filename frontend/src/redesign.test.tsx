@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import App from "./App";
@@ -974,5 +974,334 @@ describe("validation dashboard corrections", () => {
     const section = await screen.findByRole("region", { name: "How the model performed on held-out weeks" });
     await within(section).findByText("The saved evaluation data is not available");
     expect(section.querySelector(".valid-num")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Final UI polish (Step 36): search placeholder, mobile timeline label size, chart date labels.
+// ---------------------------------------------------------------------------------------------
+describe("final UI polish", () => {
+  const mondays = (start: string, count: number) => {
+    const out: string[] = [];
+    const d = new Date(`${start}T00:00:00Z`);
+    for (let i = 0; i < count; i++) {
+      out.push(d.toISOString().slice(0, 10));
+      d.setUTCDate(d.getUTCDate() + 7);
+    }
+    return out;
+  };
+  /** FIXTURE with the real week counts (77 test, 73 validation) and made-up errors, so the axis can be exercised. */
+  const longData = () => {
+    const d = JSON.parse(JSON.stringify(VAL_FIXTURE));
+    const fill = (key: "test" | "validation", start: string, count: number) => {
+      const weeks = mondays(start, count);
+      d.splits[key] = {
+        ...d.splits[key],
+        first_issue_week: weeks[0],
+        last_issue_week: weeks[count - 1],
+        issue_weeks: count,
+        predictions: count * 60,
+        weekly: weeks.map((w, i) => wk(w, 1 + (i % 7) * 0.5, 2 + (i % 7) * 0.5)),
+        pooled: { mae: 2.5, rmse: 3.5 },
+      };
+    };
+    fill("test", "2024-06-17", 77);
+    fill("validation", "2022-12-26", 73);
+    return d;
+  };
+  const labels = (section: HTMLElement) => Array.from(section.querySelectorAll<HTMLElement>(".vx-label"));
+
+  it("suggests a ward-search example that really matches, in English", async () => {
+    await ready();
+    const box = screen.getByLabelText("Search wards") as HTMLInputElement;
+    expect(box.placeholder).toBe("e.g. DNCC Ward 12");
+    expect(box.placeholder).not.toMatch(/DNCC 12/);
+    await userEvent.type(box, box.placeholder.replace(/^e\.g\. /, ""));
+    const table = document.querySelector(".ward-table") as HTMLElement;
+    expect(within(table).getByRole("button", { name: "DNCC Ward 12" })).toBeInTheDocument();
+    expect(within(table).getByRole("status")).toHaveTextContent(/Showing 1 of 1 matching ward/);
+  });
+
+  it("suggests a ward-search example that really matches, in Bangla", async () => {
+    await ready();
+    await toBangla();
+    const box = screen.getByLabelText("ওয়ার্ড খুঁজুন") as HTMLInputElement;
+    expect(box.placeholder).toBe(bn.searchPh);
+    expect(box.placeholder).toBe("যেমন: ডিএনসিসি ওয়ার্ড ১২");
+    await userEvent.type(box, box.placeholder.replace(/^যেমন: /, ""));
+    const table = document.querySelector(".ward-table") as HTMLElement;
+    expect(within(table).getByRole("button", { name: "ডিএনসিসি ওয়ার্ড ১২" })).toBeInTheDocument();
+    expect(within(table).queryByRole("heading", { name: /No wards match/ })).toBeNull();
+  });
+
+  it("leaves the search behaviour as it was (the old, unsupported wording still matches nothing)", async () => {
+    await ready();
+    await userEvent.type(screen.getByLabelText("Search wards"), "DNCC 12");
+    const table = document.querySelector(".ward-table") as HTMLElement;
+    expect(within(table).getByRole("heading", { name: "No wards match" })).toBeInTheDocument();
+  });
+
+  it("keeps the hero timeline labels at 12px or larger, including on phones (stylesheet source check)", async () => {
+    // @ts-expect-error node:fs has no type declarations in this project
+    const fs = (await import("node:fs")) as { readFileSync: (u: string, enc: string) => string };
+    const css = fs.readFileSync("src/styles.css", "utf-8");
+    const sizes = [...css.matchAll(/\.h-label\s*\{[^}]*?font-size:\s*([\d.]+)rem/g)].map((m) => Number(m[1]));
+    expect(sizes.length).toBeGreaterThanOrEqual(2); // base rule and the phone override
+    for (const rem of sizes) expect(rem * 16).toBeGreaterThanOrEqual(12);
+    expect(css).not.toMatch(/\.h-label\s*\{[^}]*font-size:\s*0\.6875rem/);
+  });
+
+  it("never prints a chart date label that would run past the end of the plot, and keeps every week", async () => {
+    const section = await validationReady(() => Promise.resolve(longData()));
+    const open = section.querySelector("details.tech summary") as HTMLElement;
+    for (const [split, bars, first] of [
+      ["Test (held out)", 77, "17 Jun 2024"],
+      ["Validation", 73, "26 Dec 2022"],
+    ] as const) {
+      await userEvent.click(within(section).getByRole("button", { name: split }));
+      for (const metric of ["MAE", "RMSE"]) {
+        await userEvent.click(within(section).getByRole("button", { name: metric }));
+        expect(section.querySelectorAll(".vbar")).toHaveLength(bars);
+        const l = labels(section);
+        expect(l.map((e) => e.style.left)).toEqual([0, 9, 18, 27, 36, 45, 54, 63].map((i) => `${(i / bars) * 100}%`));
+        expect(l[0]).toHaveTextContent(first);
+        for (const el of l) expect(el.textContent).toMatch(/^\d{1,2} \w{3} \d{4}$/); // full date, year included
+        // the labels sit at least 6 columns before the end, so none is cut by the plot edge
+        for (const el of l) expect(bars - (parseFloat(el.style.left) / 100) * bars).toBeGreaterThanOrEqual(6 - 1e-9);
+      }
+    }
+    // the accessible weekly table still has every week
+    await userEvent.click(open);
+    expect(section.querySelectorAll("details.tech table tbody tr")).toHaveLength(73);
+  });
+
+  it("shows the Bangla date labels in full too", async () => {
+    const section = await validationReady(() => Promise.resolve(longData()));
+    await toBangla();
+    const l = labels(section);
+    expect(l).toHaveLength(8);
+    expect(l[0]).toHaveTextContent("১৭ জুন ২০২৪");
+    for (const el of l) expect(el.textContent).toMatch(/\d{4}$|[০-৯]{4}$/);
+  });
+
+  it("hides only the date labels that are partly outside the scrolled window, and shows them again when they are fully in view", async () => {
+    const rect = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect");
+    const sw = Object.getOwnPropertyDescriptor(Element.prototype, "scrollWidth");
+    const cw = Object.getOwnPropertyDescriptor(Element.prototype, "clientWidth");
+    let shift = 0;
+    try {
+      Object.defineProperty(Element.prototype, "scrollWidth", { configurable: true, get(this: HTMLElement) { return this.classList.contains("vchart-scroll") ? 847 : 0; } });
+      Object.defineProperty(Element.prototype, "clientWidth", { configurable: true, get(this: HTMLElement) { return this.classList.contains("vchart-scroll") ? 270 : 0; } });
+      rect.mockImplementation(function (this: HTMLElement) {
+        if (this.classList.contains("vchart-scroll")) return { left: 0, right: 270, top: 0, bottom: 10, width: 270, height: 10, x: 0, y: 0, toJSON() {} } as DOMRect;
+        if (this.classList.contains("vx-label")) {
+          const idx = Array.from(document.querySelectorAll(".vx-label")).indexOf(this);
+          const left = idx * 99 - shift;
+          return { left, right: left + 62, top: 0, bottom: 10, width: 62, height: 10, x: left, y: 0, toJSON() {} } as DOMRect;
+        }
+        return { left: 0, right: 0, top: 0, bottom: 0, width: 0, height: 0, x: 0, y: 0, toJSON() {} } as DOMRect;
+      });
+      const section = await validationReady(() => Promise.resolve(longData()));
+      const scroller = section.querySelector(".vchart-scroll") as HTMLElement;
+      const hidden = () => labels(section).map((e) => e.classList.contains("is-clipped"));
+      fireEvent.scroll(scroller);
+      expect(hidden()).toEqual([false, false, false, true, true, true, true, true]); // 4th label starts at 297, outside a 270px window
+      shift = 99; // scrolled one label along: the first is cut off on the left, the 4th now fits
+      fireEvent.scroll(scroller);
+      expect(hidden()).toEqual([true, false, false, false, true, true, true, true]);
+      shift = 0;
+      fireEvent.scroll(scroller);
+      expect(hidden()[0]).toBe(false);
+    } finally {
+      rect.mockRestore();
+      if (sw) Object.defineProperty(Element.prototype, "scrollWidth", sw);
+      if (cw) Object.defineProperty(Element.prototype, "clientWidth", cw);
+    }
+  });
+
+  it("hides no label when the chart is not scrolling (wide screens)", async () => {
+    const section = await validationReady(() => Promise.resolve(longData()));
+    fireEvent.scroll(section.querySelector(".vchart-scroll") as HTMLElement);
+    expect(labels(section).some((e) => e.classList.contains("is-clipped"))).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Step 36B: the hover tooltip is anchored on its own bar (same % geometry as the bars and date labels).
+// Real pixel layout is verified in a real browser; these tests check the anchor, the text and the clamping logic.
+// ---------------------------------------------------------------------------------------------
+describe("validation tooltip placement", () => {
+  const mondays = (start: string, count: number) => {
+    const out: string[] = [];
+    const d = new Date(`${start}T00:00:00Z`);
+    for (let i = 0; i < count; i++) {
+      out.push(d.toISOString().slice(0, 10));
+      d.setUTCDate(d.getUTCDate() + 7);
+    }
+    return out;
+  };
+  const TEST_WEEKS = mondays("2024-06-17", 77);
+  const VAL_WEEKS = mondays("2022-12-26", 73);
+  /** FIXTURE with the real week counts and made-up errors. MAE of week i is 1 + (i % 7) * 0.5, RMSE is MAE + 1. */
+  const longData = () => {
+    const d = JSON.parse(JSON.stringify(VAL_FIXTURE));
+    const fill = (key: "test" | "validation", weeks: string[]) => {
+      d.splits[key] = {
+        ...d.splits[key],
+        first_issue_week: weeks[0],
+        last_issue_week: weeks[weeks.length - 1],
+        issue_weeks: weeks.length,
+        predictions: weeks.length * 60,
+        weekly: weeks.map((w, i) => wk(w, 1 + (i % 7) * 0.5, 2 + (i % 7) * 0.5)),
+        pooled: { mae: 2.5, rmse: 3.5 },
+      };
+    };
+    fill("test", TEST_WEEKS);
+    fill("validation", VAL_WEEKS);
+    return d;
+  };
+  const bars = (section: HTMLElement) => Array.from(section.querySelectorAll<HTMLElement>(".vbar"));
+  const tip = () => screen.getByTestId("validation-tooltip");
+  const hover = (el: HTMLElement) => act(() => void fireEvent.mouseMove(el));
+
+  it("anchors the tooltip on the hovered bar as a share of the plot width, whatever the screen width", async () => {
+    const section = await validationReady(() => Promise.resolve(longData()));
+    const b = bars(section);
+    expect(b).toHaveLength(77);
+    for (const i of [0, 1, 2, 3, 38, 73, 74, 75, 76]) {
+      hover(b[i]!);
+      expect(tip().style.left).toBe(`${((i + 0.5) / 77) * 100}%`);
+      expect(tip().className).toBe("vtip"); // one rule for every bar, no special start/end placement by pixel
+    }
+  });
+
+  it("shows the hovered week and its error, and not a neighbour's", async () => {
+    const section = await validationReady(() => Promise.resolve(longData()));
+    const b = bars(section);
+    const { date } = makeFormatters("en");
+    for (const i of [0, 40, 76]) {
+      hover(b[i]!);
+      expect(tip()).toHaveTextContent(`Issue week of ${date(TEST_WEEKS[i]!)}`);
+      expect(tip()).toHaveTextContent(`MAE ${(1 + (i % 7) * 0.5).toFixed(2)} cases`);
+    }
+    await userEvent.click(within(section).getByRole("button", { name: "RMSE" }));
+    hover(bars(section)[40]!);
+    expect(tip()).toHaveTextContent(`RMSE ${(2 + (40 % 7) * 0.5).toFixed(2)} cases`);
+  });
+
+  it("uses the same anchor for the Validation split (73 weeks) and keeps its text", async () => {
+    const section = await validationReady(() => Promise.resolve(longData()));
+    await userEvent.click(within(section).getByRole("button", { name: "Validation" }));
+    const b = bars(section);
+    expect(b).toHaveLength(73);
+    const { date } = makeFormatters("en");
+    for (const i of [0, 36, 72]) {
+      hover(b[i]!);
+      expect(tip().style.left).toBe(`${((i + 0.5) / 73) * 100}%`);
+      expect(tip()).toHaveTextContent(`Issue week of ${date(VAL_WEEKS[i]!)}`);
+    }
+  });
+
+  describe("keeping the tooltip inside the visible chart window (layout mocked: jsdom has no layout)", () => {
+    let nominalLeft = 0;
+    let tipWidth = 240;
+    const mockLayout = () => {
+      const rect = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect");
+      rect.mockImplementation(function (this: HTMLElement) {
+        const box = (left: number, width: number) => ({ left, right: left + width, top: 0, bottom: 10, width, height: 10, x: left, y: 0, toJSON() {} }) as DOMRect;
+        if (this.classList.contains("vchart-scroll")) return box(0, 270);
+        if (this.classList.contains("vtip")) return box(nominalLeft + (parseFloat(this.style.getPropertyValue("--tip-shift")) || 0), tipWidth);
+        return box(0, 0);
+      });
+      return rect;
+    };
+    const shift = () => tip().style.getPropertyValue("--tip-shift");
+
+    it("slides it right when it would stick out on the left, left when on the right, and not at all when it fits", async () => {
+      const rect = mockLayout();
+      try {
+        const section = await validationReady(() => Promise.resolve(longData()));
+        const b = bars(section);
+        nominalLeft = -60;
+        tipWidth = 240;
+        hover(b[0]!);
+        expect(shift()).toBe("64px"); // 4px inside the left edge
+        nominalLeft = 100;
+        hover(b[76]!);
+        expect(shift()).toBe("-74px"); // right edge 340 -> 266
+        nominalLeft = 10;
+        hover(b[38]!);
+        expect(shift()).toBe("0px");
+        nominalLeft = 0;
+        tipWidth = 300; // wider than the 270px window: the left edge wins so the start of the text stays readable
+        hover(b[1]!);
+        expect(shift()).toBe("4px");
+      } finally {
+        rect.mockRestore();
+      }
+    });
+
+    it("re-checks the position when the chart is scrolled while a tooltip is showing", async () => {
+      const rect = mockLayout();
+      try {
+        const section = await validationReady(() => Promise.resolve(longData()));
+        nominalLeft = 10;
+        tipWidth = 240;
+        hover(bars(section)[20]!);
+        expect(shift()).toBe("0px");
+        nominalLeft = 100; // the tooltip is now partly out of the window
+        fireEvent.scroll(section.querySelector(".vchart-scroll") as HTMLElement);
+        expect(shift()).toBe("-74px");
+      } finally {
+        rect.mockRestore();
+      }
+    });
+
+    it("keyboard: the active bar is scrolled into view, so its tooltip stays beside it", async () => {
+      const rect = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect");
+      let sl = 0;
+      try {
+        const section = await validationReady(() => Promise.resolve(longData()));
+        const scroller = section.querySelector(".vchart-scroll") as HTMLElement;
+        Object.defineProperty(scroller, "scrollLeft", { configurable: true, get: () => sl, set: (v: number) => void (sl = Math.max(0, v)) });
+        rect.mockImplementation(function (this: HTMLElement) {
+          const box = (left: number, width: number) => ({ left, right: left + width, top: 0, bottom: 10, width, height: 10, x: left, y: 0, toJSON() {} }) as DOMRect;
+          if (this === scroller) return box(0, 270);
+          if (this.classList.contains("vbar")) return box(bars(section).indexOf(this) * 11 - sl, 11);
+          return box(0, 0);
+        });
+        const slider = within(section).getByRole("slider");
+        await act(async () => {
+          slider.focus();
+        });
+        // the forecast issue week (28 Jul 2025) is bar 58, at x = 638: well to the right of a 270px window
+        expect(sl).toBe(638 + 11 - 270 + 8);
+        await userEvent.keyboard("{Home}");
+        expect(sl).toBe(0);
+        expect(slider.getAttribute("aria-valuetext")).toContain(`issue week of ${makeFormatters("en").date(TEST_WEEKS[0]!)}`);
+        await userEvent.keyboard("{End}");
+        expect(sl).toBe(76 * 11 + 11 - 270 + 8);
+        expect(tip()).toHaveTextContent(`Issue week of ${makeFormatters("en").date(TEST_WEEKS[76]!)}`);
+      } finally {
+        rect.mockRestore();
+      }
+    });
+  });
+});
+
+describe("validation chart hover vs keyboard", () => {
+  it("only real pointer movement changes the active week, so a bar scrolled under a parked pointer cannot override the keyboard", async () => {
+    const section = await validationReady();
+    const bars = Array.from(section.querySelectorAll<HTMLElement>(".vbar"));
+    const slider = within(section).getByRole("slider");
+    await act(async () => {
+      slider.focus();
+    });
+    await userEvent.keyboard("{End}");
+    expect(screen.getByTestId("validation-tooltip")).toHaveTextContent("Issue week of 11 Aug 2025");
+    act(() => void fireEvent.mouseEnter(bars[1]!)); // the bar moved under a still pointer: enter without movement
+    expect(screen.getByTestId("validation-tooltip")).toHaveTextContent("Issue week of 11 Aug 2025");
+    act(() => void fireEvent.mouseMove(bars[1]!)); // the user really moved the pointer
+    expect(screen.getByTestId("validation-tooltip")).toHaveTextContent("Issue week of 21 Jul 2025");
   });
 });

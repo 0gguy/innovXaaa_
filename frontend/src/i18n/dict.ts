@@ -179,7 +179,7 @@ export const en = {
   // list
   listTitle: "Ward list",
   search: "Search wards",
-  searchPh: "e.g. DNCC 12",
+  searchPh: "e.g. DNCC Ward 12",
   listCity: "City",
   allCities: "All cities",
   orderBy: "Order by",
@@ -500,7 +500,7 @@ export const bn: Dict = {
 
   listTitle: "ওয়ার্ডের তালিকা",
   search: "ওয়ার্ড খুঁজুন",
-  searchPh: "যেমন: DNCC 12",
+  searchPh: "যেমন: ডিএনসিসি ওয়ার্ড ১২",
   listCity: "শহর",
   allCities: "সব শহর",
   orderBy: "সাজান",

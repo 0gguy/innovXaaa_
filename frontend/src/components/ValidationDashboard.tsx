@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { ApiError } from "../api/client";
 import type { RollingYear, ValidationData, ValidationSplit } from "../api/types";
 import { useI18n } from "../i18n/I18n";
@@ -11,6 +11,8 @@ export type ValidationLoader = (signal: AbortSignal) => Promise<unknown>;
 const DATA_URL = `${import.meta.env.BASE_URL}validation/weekly_errors.json`;
 const COL_W = 11; // px per issue week; the chart scrolls sideways when the screen is narrower
 const LABEL_EVERY = 9;
+/** A date label is about 6 columns wide; one that would run past the end of the plot is left out (the axis title and table give the range). */
+const LABEL_COLS = 6;
 
 /** Reads the committed static file. No network beyond the app's own origin. */
 export const fetchValidation: ValidationLoader = async (signal) => {
@@ -174,11 +176,30 @@ export function ValidationDashboard({ issueDate, loader = fetchValidation }: { i
   );
 }
 
+/**
+ * The tooltip is anchored on its bar (a % of the plot width, like the bars and the date labels) and centred there by CSS.
+ * This only slides it sideways, by a pixel offset in --tip-shift, when it would stick out of the visible chart window
+ * (near either end of the chart, or on a narrow screen). It measures and writes in one go, so nothing is painted in between.
+ */
+function placeTip(box: HTMLElement | null) {
+  const tip = box?.querySelector<HTMLElement>(".vtip");
+  if (!box || !tip) return;
+  tip.style.setProperty("--tip-shift", "0px");
+  const view = box.getBoundingClientRect();
+  const r = tip.getBoundingClientRect();
+  const gap = 4;
+  let shift = 0;
+  if (r.right > view.right - gap) shift = view.right - gap - r.right;
+  if (r.left + shift < view.left + gap) shift = view.left + gap - r.left;
+  tip.style.setProperty("--tip-shift", `${Math.round(shift * 10) / 10}px`);
+}
+
 function ValidationBody({ data, issueDate }: { data: ValidationData; issueDate: string | null }) {
   const { t, num, int, date, dayMonth } = useI18n();
   const [splitKey, setSplitKey] = useState<SplitKey>("test");
   const [metric, setMetric] = useState<MetricKey>("mae");
   const [active, setActive] = useState<number | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const split = data.splits[splitKey];
   const weeks = split.weekly;
@@ -193,6 +214,49 @@ function ValidationBody({ data, issueDate }: { data: ValidationData; issueDate: 
   const [o1, o2, o3] = data.target_window_offset_days as [number, number, number];
   const n = weeks.length;
 
+  // On a narrow screen the chart scrolls sideways. Hide any date label that is only partly inside the visible
+  // window, so a label is never shown cut off (for example "21 Oct 20"). It reappears as soon as it is fully in view.
+  useEffect(() => {
+    const box = scrollRef.current;
+    if (!box) return;
+    const update = () => {
+      const view = box.getBoundingClientRect();
+      const scrolls = box.scrollWidth > box.clientWidth + 1;
+      box.querySelectorAll<HTMLElement>(".vx-label").forEach((el) => {
+        const r = el.getBoundingClientRect();
+        el.classList.toggle("is-clipped", scrolls && (r.left < view.left - 0.5 || r.right > view.right + 0.5));
+      });
+    };
+    const refresh = () => {
+      update();
+      placeTip(box);
+    };
+    update();
+    box.addEventListener("scroll", refresh, { passive: true });
+    window.addEventListener("resize", refresh);
+    return () => {
+      box.removeEventListener("scroll", refresh);
+      window.removeEventListener("resize", refresh);
+    };
+  }, [splitKey, n, date]);
+
+  // keep the tooltip inside the visible chart window whenever it appears or changes
+  useLayoutEffect(() => {
+    placeTip(scrollRef.current);
+  }, [active, splitKey, metric, n, t]);
+
+  // Hovering always happens on a visible bar. With the keyboard, the active bar can be off screen on a narrow
+  // screen, so bring it into view (the minimum scroll) so the tooltip stays next to it.
+  const reveal = (i: number) => {
+    const box = scrollRef.current;
+    const bar = box?.querySelectorAll<HTMLElement>(".vbar")[i];
+    if (!box || !bar) return;
+    const v = box.getBoundingClientRect();
+    const r = bar.getBoundingClientRect();
+    if (r.left < v.left) box.scrollLeft -= v.left - r.left + 8;
+    else if (r.right > v.right) box.scrollLeft += r.right - v.right + 8;
+  };
+
   const choose = (next: SplitKey) => {
     setSplitKey(next);
     setActive(null);
@@ -202,7 +266,9 @@ function ValidationBody({ data, issueDate }: { data: ValidationData; issueDate: 
     const keys: Record<string, number> = { ArrowLeft: cur - 1, ArrowRight: cur + 1, Home: 0, End: n - 1, PageUp: cur - 8, PageDown: cur + 8 };
     if (!(e.key in keys)) return;
     e.preventDefault();
-    setActive(Math.min(n - 1, Math.max(0, keys[e.key] as number)));
+    const next = Math.min(n - 1, Math.max(0, keys[e.key] as number));
+    setActive(next);
+    reveal(next);
   };
   const act = active !== null ? weeks[active] : undefined;
   const sliderText = act
@@ -308,7 +374,7 @@ function ValidationBody({ data, issueDate }: { data: ValidationData; issueDate: 
               ))}
             </div>
           </div>
-          <div className="vchart-scroll">
+          <div className="vchart-scroll" ref={scrollRef}>
             <div className="vchart-body" style={{ minWidth: `${n * COL_W}px` }}>
               <div className="vgrid" aria-hidden="true">
                 {axis.ticks.map((v) => (
@@ -328,7 +394,11 @@ function ValidationBody({ data, issueDate }: { data: ValidationData; issueDate: 
                 aria-valuenow={(active ?? (selectedIdx >= 0 ? selectedIdx : n - 1)) + 1}
                 aria-valuetext={sliderText}
                 onKeyDown={move}
-                onFocus={() => setActive((a) => a ?? (selectedIdx >= 0 ? selectedIdx : n - 1))}
+                onFocus={() => {
+                  const i = active ?? (selectedIdx >= 0 ? selectedIdx : n - 1);
+                  setActive(i);
+                  reveal(i);
+                }}
                 onBlur={() => setActive(null)}
                 onMouseLeave={() => setActive(null)}
               >
@@ -337,7 +407,7 @@ function ValidationBody({ data, issueDate }: { data: ValidationData; issueDate: 
                     key={w.issue_week}
                     className={`vbar${i === selectedIdx ? " is-selected" : ""}${i === active ? " is-active" : ""}`}
                     data-week={w.issue_week}
-                    onMouseEnter={() => setActive(i)}
+                    onMouseMove={() => setActive(i)}
                     onClick={() => setActive(i)}
                   >
                     <span className="vbar-col" style={{ height: pct(w[metric]) }}>
@@ -352,8 +422,8 @@ function ValidationBody({ data, issueDate }: { data: ValidationData; issueDate: 
               </div>
               {act && active !== null && (
                 <div
-                  className={`vtip${active < 3 ? " tip-start" : active > n - 4 ? " tip-end" : ""}`}
-                  style={active < 3 ? { left: `${active * COL_W}px` } : active > n - 4 ? { right: `${(n - 1 - active) * COL_W}px` } : { left: `${(active + 0.5) * COL_W}px` }}
+                  className="vtip"
+                  style={{ left: `${((active + 0.5) / n) * 100}%` }}
                   role="presentation"
                   data-testid="validation-tooltip"
                 >
@@ -367,8 +437,8 @@ function ValidationBody({ data, issueDate }: { data: ValidationData; issueDate: 
               )}
               <div className="vx" aria-hidden="true">
                 {weeks.map((w, i) =>
-                  i % LABEL_EVERY === 0 ? (
-                    <span key={w.issue_week} className="vx-label" style={{ left: `${i * COL_W}px` }}>
+                  i % LABEL_EVERY === 0 && n - i >= LABEL_COLS ? (
+                    <span key={w.issue_week} className="vx-label" style={{ left: `${(i / n) * 100}%` }}>
                       {date(w.issue_week)}
                     </span>
                   ) : null,

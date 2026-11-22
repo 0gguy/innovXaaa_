@@ -1312,7 +1312,7 @@ html[lang="bn"] .compare-num {
     gap: 3px;
   }
   .h-label {
-    font-size: 0.6875rem;
+    font-size: 0.75rem;
   }
   .h-date {
     font-size: 0.8125rem;
@@ -1873,6 +1873,9 @@ select {
   color: var(--ink-2);
   white-space: nowrap;
 }
+.vx-label.is-clipped {
+  visibility: hidden;
+}
 .vchart-body .x-title {
   position: sticky;
   left: 0;
@@ -1882,7 +1885,7 @@ select {
   position: absolute;
   top: 4px;
   z-index: 5;
-  transform: translateX(-50%);
+  transform: translateX(calc(-50% + var(--tip-shift, 0px)));
   width: max-content;
   max-width: 15rem;
   display: grid;
@@ -1897,10 +1900,6 @@ select {
 }
 .vtip strong {
   font-size: 0.875rem;
-}
-.vtip.tip-start,
-.vtip.tip-end {
-  transform: none;
 }
 .vlegend {
   display: flex;
