@@ -73,17 +73,17 @@ Open <http://127.0.0.1:5173>. The default view is Dhaka North, DNCC Ward 12, iss
 - All versions are pinned in [`backend/requirements.txt`](backend/requirements.txt),
   [`ml/requirements.txt`](ml/requirements.txt) and [`frontend/package-lock.json`](frontend/package-lock.json).
 
-**How long setup takes.** One fresh-clone run of commit `4eb71a6` on a Windows 10 machine, with empty pip and
+**How long setup takes.** One fresh-clone run on a Windows 10 machine, with empty pip and
 npm caches, took about 103 s: clone 13 s, virtual environment 4 s, `pip install` 76 s, `npm install` 7 s, servers
 ready in about 3 s. Ports 8000 and 5173 were busy, so that run used 8001 and 3000. It was a single run, and
-timings depend on the machine and the network.
+timings depend on the machine and the network. Time values added here are approximate, they are not precise.
 
 ## Data
 
 The dataset is `ml/data/dengue_dataset.csv`: 31,320 rows, 60 wards x 522 consecutive weeks (Mondays,
 2016-01-04 to 2025-12-29). Columns are weekly temperature (average, max, min), rainfall, relative humidity,
 dengue cases, and three fixed ward attributes (population density, water-logging risk, sanitation score). There
-are no missing values or duplicate ward-weeks. The team got it from the organizers' Google Sheet linked in the
+are no missing values or duplicate ward-weeks. The team got it from the organizer's Google Sheet linked in the
 brief.
 
 **The data probably is not real surveillance data.** We found signs that it is simulated:
@@ -210,8 +210,7 @@ python -m pytest ml/tools/tests -q -p no:cacheprovider                          
 cd frontend; npm test; npm run typecheck; npm run lint; npm run build                    # 127 tests
 ```
 
-All of these passed in our last runs (backend, ML and exporter in the fresh clone of `4eb71a6`, frontend just
-before the latest UI commit). They are our own checks, not independent testing.
+All of these passed in our last runs. They are our own checks, not independent testing.
 
 The supported runtime on Windows is `ml/predict_portable.py`, which loads the trained model from native XGBoost
 files; the equivalence tests check that its predictions match the original pipeline. The original joblib loader
