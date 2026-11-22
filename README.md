@@ -238,9 +238,8 @@ Responsibilities as given by the team:
   integration, API tests, end-to-end checks, GitHub coordination.
 - **Muhammad Asir Hossain Chowdhury:** dataset analysis, machine-learning workflow, XGBoost development and
   evaluation, model documentation and artifacts, portable model export.
-- **S.M. Gazi Salauddin Chowdhury:** experimental weather-lag preprocessing and Random Forest training,
-  documentation and presentation.
-
+- **S.M. Gazi Salauddin Chowdhury:**  weather-lag preprocessing and Random Forest baseline exploration,
+README and operational response documentation, and presentation materials.
 Individual commits are in the repository history (the team says the GitHub account `0gguy` is Masnoon's). The
 experimental weather-lag and Random Forest work is on the separate branches
 [`feat/weather-lag-pipeline`](https://github.com/0gguy/innovXaaa_/tree/feat/weather-lag-pipeline) and
