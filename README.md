@@ -254,9 +254,8 @@ presentation work is not visible in Git.
 AI assistance: Claude and Claude Code (Anthropic) were used for development support, including code
 suggestions, debugging, testing and documentation. In detail:
 
-- **Claude Code:** the FastAPI backend, React frontend, model integration, automated tests, browser checks and
-  documentation drafts (including this README). Claude Sonnet 5.5 was used for the backend, frontend,
-  integration and documentation; the model used in earlier sessions was not recorded.
+- **Claude:** the FastAPI backend, React frontend, model integration, automated tests, browser checks and
+  documentation drafts. 
 - **Claude and Claude Browser:** the dataset analysis, the XGBoost workflow, evaluation and the model report, and
   general development use, as stated by the team.
 - **Claude Code skills** (`frontend-design`, `impeccable`, `unslop`) gave design guidance and a lint check; they
