@@ -1,8 +1,9 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { ApiError } from "./api/client";
+import { niceAxis, parseValidation } from "./components/ValidationDashboard";
 import { bn, en } from "./i18n/dict";
 import { bnDigits, makeFormatters } from "./i18n/I18n";
 import { allFor, fakeClient, makeMeta, oneFor } from "./test/fixtures";
@@ -470,7 +471,8 @@ describe("translations", () => {
 
   it("has a real Bangla string for every user-facing key (only the English-language button label may be Latin)", () => {
     for (const [k, v] of Object.entries(bn)) {
-      if (k === "langEn" || k === "langEnLabel") continue;
+      // technical term labels that stay in Latin script on purpose
+      if (["langEn", "langEnLabel", "vMae", "vRmse", "vThMae", "vThRmse"].includes(k)) continue;
       const texts = (k === "tierRange"
         ? (["Low", "Medium", "High", "Critical"] as const).map((t) => (v as (t: string, e: string[]) => string)(t, ["१", "२", "३"]))
         : sample(v)
@@ -514,5 +516,463 @@ describe("hero", () => {
     expect(layer).toContain("pointer-events: none");
     expect(layer).toContain("z-index: -1");
     expect(/\.masthead\s*\{[^}]*background:\s*var\(--teal\)/.test(styles)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Validation error dashboard. FIXTURE numbers only: they exercise the UI and are not the real metrics.
+// The last test reads the real exported file and checks it against the documented references.
+// ---------------------------------------------------------------------------------------------
+const wk = (issue_week: string, mae: number, rmse: number) => ({ issue_week, mae, rmse, n: 60 });
+const VAL_FIXTURE = {
+  schema_version: 1,
+  model_version: "dengue-xgb-2to4w-1.1.0",
+  error_unit: "Combined dengue cases over forecast weeks t+2, t+3 and t+4 (one total per ward and issue week). Not a percentage and not a single week.",
+  prediction_basis: "Clipped (as served) predictions saved to four decimals in ml/eval. Not raw model output.",
+  pooled_metric_basis: "Pooled across every ward prediction in the split. Not an average of weekly values.",
+  data_provenance_note: "appears simulated",
+  target_window_offset_days: [14, 21, 28],
+  splits: {
+    test: {
+      evaluation_scheme: "test scheme",
+      first_issue_week: "2025-07-14",
+      last_issue_week: "2025-08-11",
+      issue_weeks: 5,
+      predictions: 300,
+      wards_per_week: 60,
+      pooled: { mae: 4.5, rmse: 6.25 },
+      weekly: [wk("2025-07-14", 3.1, 4), wk("2025-07-21", 4.2, 5.5), wk("2025-07-28", 5, 6.1), wk("2025-08-04", 6.3, 8), wk("2025-08-11", 2.2, 3)],
+    },
+    validation: {
+      evaluation_scheme: "validation scheme",
+      first_issue_week: "2023-07-03",
+      last_issue_week: "2023-07-24",
+      issue_weeks: 4,
+      predictions: 240,
+      wards_per_week: 60,
+      pooled: { mae: 2.137121, rmse: 4.372975 },
+      weekly: [wk("2023-07-03", 1.5, 2.5), wk("2023-07-10", 2.5, 4), wk("2023-07-17", 3, 5), wk("2023-07-24", 1.2, 2)],
+    },
+  },
+  rolling_origin: {
+    evaluation_scheme: "rolling scheme",
+    years: [
+      { year: 2024, rows: 3180, mae: 1.893907, rmse: 3.52842 },
+      { year: 2025, rows: 2880, mae: 2.831773, rmse: 5.104812 },
+    ],
+  },
+};
+
+async function validationReady(loader: () => Promise<unknown> = () => Promise.resolve(VAL_FIXTURE)) {
+  render(<App client={fakeClient()} validationLoader={loader} />);
+  await screen.findByRole("heading", { name: "DNCC Ward 12" });
+  return screen.findByRole("region", { name: /held-out weeks|সংরক্ষিত পরীক্ষার/ });
+}
+
+describe("validation error dashboard", () => {
+  it("sits after the ward charts and before the methodology, and defaults to the held-out test split", async () => {
+    const section = await validationReady();
+    const order = Array.from(document.querySelectorAll("main > section")).map((s) => s.getAttribute("aria-labelledby"));
+    expect(order.indexOf("valid-title")).toBeGreaterThan(order.indexOf("overview-title"));
+    expect(order.indexOf("valid-title")).toBeLessThan(order.indexOf("method-title"));
+    expect(within(section).getByRole("heading", { name: "How the model performed on held-out weeks" })).toBeInTheDocument();
+    expect(within(section).getByRole("button", { name: "Test (held out)" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(section).getByTestId("pooled-mae")).toHaveTextContent("4.500");
+    expect(within(section).getByTestId("pooled-rmse")).toHaveTextContent("6.250");
+    expect(section).toHaveTextContent("14 Jul 2025 – 11 Aug 2025");
+    expect(section).toHaveTextContent("300"); // ward predictions
+    expect(section).toHaveTextContent("60 wards each week");
+    expect(section).toHaveTextContent("combined dengue cases for forecast weeks +2 to +4");
+    expect(section).toHaveTextContent("not raw model output");
+    expect(section).toHaveTextContent("not percentages");
+  });
+
+  it("switches the split and updates every label, range and headline metric", async () => {
+    const section = await validationReady();
+    await userEvent.click(within(section).getByRole("button", { name: "Validation" }));
+    expect(within(section).getByRole("button", { name: "Validation" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(section).getByRole("button", { name: "Test (held out)" })).toHaveAttribute("aria-pressed", "false");
+    expect(within(section).getByTestId("pooled-mae")).toHaveTextContent("2.137");
+    expect(within(section).getByTestId("pooled-rmse")).toHaveTextContent("4.373");
+    expect(section).toHaveTextContent("3 Jul 2023 – 24 Jul 2023");
+    expect(section).toHaveTextContent("240");
+    expect(section).toHaveTextContent("trained on the training period only");
+    expect(section.querySelectorAll(".vbar")).toHaveLength(4);
+    expect(within(section).getByRole("group", { name: /^Validation: weekly MAE by issue week, 4 weeks from 3 Jul 2023 to 24 Jul 2023/ })).toBeInTheDocument();
+  });
+
+  it("switches MAE and RMSE and moves the dashed pooled reference line with it", async () => {
+    const section = await validationReady();
+    const ref = () => section.querySelector(".vref") as HTMLElement;
+    const key = () => within(section).getByTestId("reference-key");
+    // the label lives above the chart, never inside the plotting area
+    expect(ref().textContent).toBe("");
+    expect(section.querySelector(".vchart-body")).not.toContainElement(key());
+    // fixture axis: max(6.3, 4.5) -> 0..8 in steps of 2
+    expect(key()).toHaveTextContent("Dashed reference line — Pooled MAE: 4.500");
+    expect(ref().style.bottom).toBe(`${(4.5 / 8) * 100}%`);
+    const col = (d: string) => section.querySelector(`.vbar[data-week="${d}"] .vbar-col`) as HTMLElement;
+    expect(col("2025-08-04").style.height).toBe(`${(6.3 / 8) * 100}%`);
+    await userEvent.click(within(section).getByRole("button", { name: "RMSE" }));
+    // RMSE axis: max(8, 6.25) -> 0..8
+    expect(key()).toHaveTextContent("Dashed reference line — Pooled RMSE: 6.250");
+    expect(ref().textContent).toBe("");
+    expect(ref().style.bottom).toBe(`${(6.25 / 8) * 100}%`);
+    expect(col("2025-08-04").style.height).toBe("100%");
+    expect(section.querySelector(".vy-title")).toHaveTextContent("RMSE (combined dengue cases)");
+  });
+
+  it("keeps the reference indicator and line correct for all four split and metric combinations", async () => {
+    const section = await validationReady();
+    const key = () => within(section).getByTestId("reference-key");
+    const line = () => section.querySelector(".vref") as HTMLElement;
+    const cases: [string, string, string, number, number][] = [
+      ["Test (held out)", "MAE", "4.500", 4.5, 8],
+      ["Test (held out)", "RMSE", "6.250", 6.25, 8],
+      ["Validation", "MAE", "2.137", 2.137121, 3],
+      ["Validation", "RMSE", "4.373", 4.372975, 5],
+    ];
+    for (const [split, metric, shown, exact, top] of cases) {
+      await userEvent.click(within(section).getByRole("button", { name: split }));
+      await userEvent.click(within(section).getByRole("button", { name: metric }));
+      expect(key()).toHaveTextContent(`Dashed reference line — Pooled ${metric}: ${shown}`);
+      expect(line().style.bottom).toBe(`${(exact / top) * 100}%`);
+      expect(line().textContent).toBe("");
+    }
+  });
+
+  it("marks the selected historical issue week, and says changing it does not change the split", async () => {
+    const section = await validationReady();
+    expect(section.querySelectorAll(".vbar.is-selected")).toHaveLength(1);
+    expect(section.querySelector(".vbar.is-selected")).toHaveAttribute("data-week", "2025-07-28");
+    expect(section).toHaveTextContent("Outlined bar with a triangle");
+    expect(section).toHaveTextContent("does not change the evaluation split");
+    await userEvent.click(within(section).getByRole("button", { name: "Validation" }));
+    expect(section.querySelectorAll(".vbar.is-selected")).toHaveLength(0);
+    expect(section).toHaveTextContent("not part of this evaluation split");
+    // picking another historical week above leaves the evaluation split alone
+    await userEvent.selectOptions(screen.getByLabelText("Week"), "2025-08-04");
+    expect(within(section).getByRole("button", { name: "Validation" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("shows a tooltip with the issue week, error, split, ward count and the +14/+21/+28 day target window", async () => {
+    const section = await validationReady();
+    expect(screen.queryByTestId("validation-tooltip")).not.toBeInTheDocument();
+    await userEvent.hover(section.querySelector('.vbar[data-week="2025-07-28"]')!);
+    const tip = screen.getByTestId("validation-tooltip");
+    expect(tip).toHaveTextContent("Issue week of 28 Jul 2025");
+    expect(tip).toHaveTextContent("Test (held out): MAE 5.00 cases");
+    expect(tip).toHaveTextContent("60 ward predictions");
+    expect(tip).toHaveTextContent("Target: combined cases for weeks beginning 11 Aug, 18 Aug and 25 Aug 2025");
+    await userEvent.click(within(section).getByRole("button", { name: "RMSE" }));
+    await userEvent.hover(section.querySelector('.vbar[data-week="2025-08-11"]')!);
+    expect(screen.getByTestId("validation-tooltip")).toHaveTextContent("Test (held out): RMSE 3.00 cases");
+    expect(screen.getByTestId("validation-tooltip")).toHaveTextContent("25 Aug, 1 Sep and 8 Sep 2025");
+  });
+
+  it("is keyboard operable: the chart is a labelled slider that moves between weeks", async () => {
+    const section = await validationReady();
+    const slider = within(section).getByRole("slider");
+    expect(slider).toHaveAttribute("aria-valuemin", "1");
+    expect(slider).toHaveAttribute("aria-valuemax", "5");
+    expect(slider.getAttribute("aria-label")).toContain("arrow keys");
+    await act(async () => {
+      slider.focus();
+    });
+    expect(screen.getByTestId("validation-tooltip")).toHaveTextContent("Issue week of 28 Jul 2025"); // starts on the selected week
+    await userEvent.keyboard("{ArrowRight}");
+    expect(screen.getByTestId("validation-tooltip")).toHaveTextContent("Issue week of 4 Aug 2025");
+    expect(slider.getAttribute("aria-valuetext")).toContain("issue week of 4 Aug 2025: MAE 6.30 cases");
+    await userEvent.keyboard("{Home}");
+    expect(screen.getByTestId("validation-tooltip")).toHaveTextContent("Issue week of 14 Jul 2025");
+    await userEvent.keyboard("{End}");
+    expect(screen.getByTestId("validation-tooltip")).toHaveTextContent("Issue week of 11 Aug 2025");
+    expect(section.querySelector("#vchart-desc")).toHaveTextContent("The highest week is the issue week of 4 Aug 2025");
+  });
+
+  it("offers the weekly values as a table", async () => {
+    const section = await validationReady();
+    const details = section.querySelector("details")!;
+    expect(details.open).toBe(false);
+    await userEvent.click(within(section).getByText("Show the weekly values as a table"));
+    const rows = within(details).getAllByRole("row");
+    expect(rows).toHaveLength(6); // header + 5 weeks
+    expect(rows[3]).toHaveTextContent("28 Jul 2025");
+    expect(rows[3]).toHaveTextContent("5.00");
+    expect(rows[3]).toHaveTextContent("6.10");
+  });
+
+  it("keeps rolling-origin results in a separate, clearly labelled panel", async () => {
+    const section = await validationReady();
+    const roll = within(section).getByRole("heading", { name: "Rolling-origin evaluation by year" }).parentElement!;
+    expect(roll).toHaveTextContent("retrained for each year");
+    expect(roll).toHaveTextContent("not comparable week by week");
+    expect(roll).toHaveTextContent("2024");
+    expect(roll).toHaveTextContent("1.89");
+    expect(roll).toHaveTextContent("3.53");
+    expect(section.querySelector(".vchart")).not.toContainElement(roll);
+    expect(screen.queryByTestId("validation-tooltip")).not.toBeInTheDocument();
+  });
+
+  it("states the limits: simulated data, no intervals, combined target, not a guarantee", async () => {
+    const section = await validationReady();
+    expect(section).toHaveTextContent("appears simulated");
+    expect(section).toHaveTextContent("No confidence or prediction intervals");
+    expect(section).toHaveTextContent("combined +2, +3 and +4 week total");
+    expect(section).toHaveTextContent("does not guarantee accuracy on future outbreaks");
+    expect(section).toHaveTextContent("not a promise of future accuracy");
+  });
+
+  it("works in Bangla with Bangla digits, keeping the split, metric and forecast selection", async () => {
+    const section = await validationReady();
+    await userEvent.click(within(section).getByRole("button", { name: "Validation" }));
+    await userEvent.click(within(section).getByRole("button", { name: "RMSE" }));
+    await toBangla();
+    const bnSection = screen.getByRole("region", { name: bn.vTitle });
+    expect(within(bnSection).getByRole("button", { name: bn.vSplitValidation })).toHaveAttribute("aria-pressed", "true");
+    expect(within(bnSection).getByRole("button", { name: "RMSE" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(bnSection).getByTestId("pooled-rmse")).toHaveTextContent("৪.৩৭৩");
+    expect(within(bnSection).getByTestId("reference-key")).toHaveTextContent("ড্যাশ রেখা — সম্মিলিত RMSE: ৪.৩৭৩");
+    expect(bnSection).toHaveTextContent("৩ জুলাই ২০২৩ – ২৪ জুলাই ২০২৩");
+    expect(bnSection).toHaveTextContent(bn.vNotes[0]!);
+    expect(bnSection).toHaveTextContent(bn.vRollTitle);
+    expect(screen.getByRole("heading", { name: "ডিএনসিসি ওয়ার্ড ১২" })).toBeInTheDocument();
+    expect((screen.getByLabelText("সপ্তাহ") as HTMLSelectElement).value).toBe(DATE);
+    await userEvent.hover(bnSection.querySelector('.vbar[data-week="2023-07-10"]')!);
+    expect(screen.getByTestId("validation-tooltip")).toHaveTextContent("১০ জুলাই ২০২৩ তারিখের ইস্যু সপ্তাহ");
+    expect(screen.getByTestId("validation-tooltip")).toHaveTextContent("২৪ জুলাই, ৩১ জুলাই ও ৭ আগস্ট ২০২৩");
+  });
+
+  it("shows a safe message and no numbers when the data is missing, unreadable or malformed", async () => {
+    for (const loader of [
+      () => Promise.reject(new ApiError("network", "x")),
+      () => Promise.resolve({ not: "the expected shape" }),
+      () => Promise.resolve({ ...VAL_FIXTURE, splits: { ...VAL_FIXTURE.splits, test: { ...VAL_FIXTURE.splits.test, pooled: { mae: Number.NaN, rmse: 1 } } } }),
+    ]) {
+      const { unmount } = render(<App client={fakeClient()} validationLoader={loader} />);
+      const section = await screen.findByRole("region", { name: "How the model performed on held-out weeks" });
+      await within(section).findByText("The saved evaluation data is not available");
+      expect(section.querySelector(".valid-num")).toBeNull();
+      expect(within(section).queryByRole("slider")).not.toBeInTheDocument();
+      unmount();
+    }
+  });
+
+  it("shows a loading state first", async () => {
+    render(<App client={fakeClient()} validationLoader={() => new Promise<never>(() => {})} />);
+    expect(await screen.findByText("Loading the saved evaluation…")).toBeInTheDocument();
+  });
+
+  it("validates the exported shape strictly", () => {
+    expect(parseValidation(VAL_FIXTURE).splits.test.weekly).toHaveLength(5);
+    const clone = () => JSON.parse(JSON.stringify(VAL_FIXTURE));
+    const unordered = clone();
+    unordered.splits.test.weekly.reverse();
+    expect(() => parseValidation(unordered)).toThrow();
+    const negative = clone();
+    negative.splits.validation.weekly[0].mae = -1;
+    expect(() => parseValidation(negative)).toThrow();
+    const wrongCount = clone();
+    wrongCount.splits.test.issue_weeks = 9;
+    expect(() => parseValidation(wrongCount)).toThrow();
+    const badDate = clone();
+    badDate.splits.test.weekly[0].issue_week = "14/07/2025";
+    expect(() => parseValidation(badDate)).toThrow();
+    expect(() => parseValidation(null)).toThrow();
+  });
+
+  it("builds tidy axes", () => {
+    expect(niceAxis(6.3)).toEqual({ top: 8, step: 2, ticks: [0, 2, 4, 6, 8] });
+    expect(niceAxis(14.72)).toMatchObject({ top: 15, step: 5 });
+    expect(niceAxis(0.02).top).toBeGreaterThan(0.02);
+  });
+
+  it("the exported JSON file is valid and reproduces the documented reference metrics", async () => {
+    // test-only: Vitest cannot import from public/, and node typings are not installed
+    // @ts-expect-error node:fs has no type declarations in this project
+    const fs = (await import("node:fs")) as { readFileSync: (u: string, enc: string) => string };
+    const data = parseValidation(JSON.parse(fs.readFileSync("public/validation/weekly_errors.json", "utf-8")));
+    const { validation, test } = data.splits;
+    expect([test.predictions, test.issue_weeks, test.first_issue_week, test.last_issue_week]).toEqual([4620, 77, "2024-06-17", "2025-12-01"]);
+    expect([validation.predictions, validation.issue_weeks, validation.first_issue_week, validation.last_issue_week]).toEqual([4380, 73, "2022-12-26", "2024-05-13"]);
+    expect(validation.last_issue_week < test.first_issue_week).toBe(true);
+    expect(test.pooled.mae).toBeCloseTo(2.7762, 3);
+    expect(test.pooled.rmse).toBeCloseTo(4.9225, 3);
+    expect(validation.pooled.mae).toBeCloseTo(2.1371, 3);
+    expect(validation.pooled.rmse).toBeCloseTo(4.373, 3);
+    for (const s of [validation, test]) for (const w of s.weekly) expect(w.n).toBe(60);
+    expect(data.rolling_origin.years.map((y) => y.year)).toEqual([2020, 2021, 2022, 2023, 2024, 2025]);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Step 31D corrections. FIXTURE numbers (VAL_FIXTURE above) exercise the UI; they are not real metrics.
+// ---------------------------------------------------------------------------------------------
+describe("validation dashboard corrections", () => {
+  const clone = () => JSON.parse(JSON.stringify(VAL_FIXTURE));
+
+  it("discloses that validation helped choose the model and alert threshold, and keeps test primary and default", async () => {
+    const section = await validationReady();
+    expect(within(section).getByRole("button", { name: "Test (held out)" })).toHaveAttribute("aria-pressed", "true");
+    expect(section).toHaveTextContent("This is the primary evaluation.");
+    expect(section).not.toHaveTextContent(/scored once/i);
+    expect(screen.queryByTestId("validation-caution")).not.toBeInTheDocument();
+    await userEvent.click(within(section).getByRole("button", { name: "Validation" }));
+    const caution = screen.getByTestId("validation-caution");
+    expect(caution).toHaveTextContent("also helped choose the model and the alert threshold");
+    expect(caution).toHaveTextContent("may be optimistic");
+    expect(caution).toHaveTextContent("held-out test split is the separate evaluation");
+    expect(section).not.toHaveTextContent(/scored once/i);
+    await userEvent.click(within(section).getByRole("button", { name: "Test (held out)" }));
+    expect(screen.queryByTestId("validation-caution")).not.toBeInTheDocument();
+  });
+
+  it("states the same limitation in Bangla", async () => {
+    const section = await validationReady();
+    await userEvent.click(within(section).getByRole("button", { name: "Validation" }));
+    await toBangla();
+    expect(screen.getByTestId("validation-caution")).toHaveTextContent(bn.vValidationCaution);
+    expect(bn.vValidationCaution).toContain("ভালো দেখাতে পারে");
+    expect(bn.vSplitNoteTest).toContain("প্রধান মূল্যায়ন");
+  });
+
+  it("keeps the selected-week marker visually but hides its triangle from assistive technology", async () => {
+    const section = await validationReady();
+    const marks = section.querySelectorAll(".vbar-mark");
+    expect(marks).toHaveLength(1);
+    expect(marks[0]).toHaveAttribute("aria-hidden", "true");
+    expect(marks[0]!.closest(".vbar")).toHaveAttribute("data-week", "2025-07-28");
+    expect(marks[0]!.closest(".vbar")).toHaveClass("is-selected");
+    // the slider keeps its meaningful name, with no glyph in it
+    const slider = within(section).getByRole("slider");
+    expect(slider.getAttribute("aria-label")).not.toContain("▼");
+    // and the stylesheet no longer injects the glyph as generated content
+    // @ts-expect-error node:fs has no type declarations in this project
+    const fs = (await import("node:fs")) as { readFileSync: (u: string, enc: string) => string };
+    const css = fs.readFileSync("src/styles.css", "utf-8");
+    expect(css).not.toContain('content: "\\25BC"');
+    expect(css).toMatch(/\.vbar-mark\s*\{/);
+  });
+
+  it("gives the slider a useful value text: split, week, error, wards and target window, and handles no selection", async () => {
+    const section = await validationReady();
+    const slider = within(section).getByRole("slider");
+    expect(slider).toHaveAttribute("aria-valuetext", "No week selected yet. 5 issue weeks; use the arrow keys.");
+    await act(async () => {
+      slider.focus();
+    });
+    expect(slider).toHaveAttribute(
+      "aria-valuetext",
+      "Test (held out), issue week of 28 Jul 2025: MAE 5.00 cases, 60 wards, target weeks beginning 11 Aug, 18 Aug and 25 Aug 2025. This is also the issue week selected in the forecast controls.",
+    );
+    await userEvent.keyboard("{ArrowRight}");
+    expect(slider).toHaveAttribute(
+      "aria-valuetext",
+      "Test (held out), issue week of 4 Aug 2025: MAE 6.30 cases, 60 wards, target weeks beginning 18 Aug, 25 Aug and 1 Sep 2025.",
+    );
+    await userEvent.click(within(section).getByRole("button", { name: "RMSE" }));
+    await act(async () => {
+      slider.focus();
+    });
+    await userEvent.keyboard("{Home}");
+    expect(slider.getAttribute("aria-valuetext")).toContain("issue week of 14 Jul 2025: RMSE 4.00 cases");
+    // the chart selection is not the forecast control
+    expect(section.querySelector("#vchart-desc")).toHaveTextContent("does not change the issue week selected in the forecast controls");
+    expect(slider.getAttribute("aria-valuetext")).not.toContain("NaN");
+  });
+
+  it("gives the slider a Bangla value text from the same data point", async () => {
+    await validationReady();
+    await toBangla();
+    const slider = screen.getByRole("slider");
+    expect(slider.getAttribute("aria-valuetext")).toContain("এখনো কোনো সপ্তাহ বাছা হয়নি");
+    await act(async () => {
+      slider.focus();
+    });
+    const text = slider.getAttribute("aria-valuetext") ?? "";
+    expect(text).toContain("টেস্ট (আলাদা রাখা), ২৮ জুলাই ২০২৫ তারিখের ইস্যু সপ্তাহ: MAE ৫.০০ রোগী");
+    expect(text).toContain("৬০টি ওয়ার্ড");
+    expect(text).toContain("লক্ষ্য সপ্তাহ শুরু ১১ আগস্ট, ১৮ আগস্ট ও ২৫ আগস্ট ২০২৫");
+    expect(text).toContain(bn.vSliderSameWeek);
+  });
+
+  it("uses safer seasonal wording about when errors occurred, without a causal claim", async () => {
+    const section = await validationReady();
+    expect(section).toHaveTextContent("some monsoon-season months (mostly June through September)");
+    expect(section).toHaveTextContent("when errors occurred, not why");
+    expect(section).not.toHaveTextContent(/high-case months/i);
+    expect(section).toHaveTextContent("appears simulated");
+    expect(en.vNotes.join(" ")).not.toMatch(/because|due to|caused/i);
+    expect(bn.vNotes[3]).toContain("বর্ষা মৌসুমের কিছু মাসে");
+    expect(bn.vNotes[3]).toContain("কেন হয়েছে তা নয়");
+  });
+
+  it("no longer repeats the dashed-line explanation below the chart, but keeps the pill, line and selected-week note", async () => {
+    const section = await validationReady();
+    expect(within(section).queryByText(/Dashed line: pooled value/)).not.toBeInTheDocument();
+    expect(within(section).getByTestId("reference-key")).toHaveTextContent("Dashed reference line — Pooled MAE: 4.500");
+    expect(section.querySelector(".vref")).not.toBeNull();
+    const legend = section.querySelector(".vlegend")!;
+    expect(legend.querySelectorAll("li")).toHaveLength(1);
+    expect(legend).toHaveTextContent("Outlined bar with a triangle");
+    await userEvent.click(within(section).getByRole("button", { name: "Validation" }));
+    expect(section.querySelector(".vlegend")).toBeNull(); // no selected week in this split, so nothing to explain
+    expect(section.querySelector(".vref")).not.toBeNull();
+  });
+
+  const mutations: [string, (d: ReturnType<typeof clone>) => void][] = [
+    ["unsupported schema version", (d) => (d.schema_version = 2)],
+    ["wrong target offsets (+29)", (d) => (d.target_window_offset_days = [14, 21, 29])],
+    ["too few target offsets", (d) => (d.target_window_offset_days = [14, 21])],
+    ["first issue week differs from the series", (d) => (d.splits.test.first_issue_week = "2025-07-21")],
+    ["last issue week differs from the series", (d) => (d.splits.validation.last_issue_week = "2023-07-31")],
+    ["prediction count differs from the weekly counts", (d) => (d.splits.test.predictions = 299)],
+    ["weekly ward count differs from wards_per_week", (d) => {
+      d.splits.test.weekly[0].n = 59;
+      d.splits.test.predictions = 299;
+    }],
+    ["non-Monday issue week", (d) => (d.splits.test.weekly[1].issue_week = "2025-07-22")],
+    ["duplicate issue week", (d) => (d.splits.test.weekly[1] = { ...d.splits.test.weekly[0] })],
+    ["skipped week", (d) => {
+      d.splits.test.weekly.splice(2, 1);
+      d.splits.test.issue_weeks = 4;
+      d.splits.test.predictions = 240;
+      d.splits.test.last_issue_week = "2025-08-11";
+    }],
+    ["out-of-order weeks", (d) => d.splits.validation.weekly.reverse()],
+    ["impossible calendar date", (d) => {
+      d.splits.test.weekly[0].issue_week = "2025-02-30";
+      d.splits.test.first_issue_week = "2025-02-30";
+    }],
+    ["NaN weekly metric", (d) => (d.splits.test.weekly[0].mae = Number.NaN)],
+    ["infinite weekly metric", (d) => (d.splits.test.weekly[0].rmse = Number.POSITIVE_INFINITY)],
+    ["negative pooled metric", (d) => (d.splits.validation.pooled.mae = -0.1)],
+    ["weekly RMSE below MAE", (d) => (d.splits.test.weekly[0].rmse = 1)],
+    ["pooled RMSE below MAE", (d) => (d.splits.test.pooled.rmse = 1)],
+    ["validation overlaps test", (d) => (d.splits.validation = { ...d.splits.test, evaluation_scheme: "x" })],
+    ["rolling years not ascending", (d) => d.rolling_origin.years.reverse()],
+    ["rolling RMSE below MAE", (d) => (d.rolling_origin.years[0].rmse = 0.1)],
+    ["missing rolling years", (d) => (d.rolling_origin.years = [])],
+  ];
+
+  it.each(mutations)("rejects malformed data: %s", (_label, mutate) => {
+    const d = clone();
+    mutate(d);
+    expect(() => parseValidation(d)).toThrow(ApiError);
+    try {
+      parseValidation(d);
+    } catch (e) {
+      expect((e as ApiError).kind).toBe("shape");
+    }
+  });
+
+  it("still accepts the valid fixture and shows the safe unavailable state for a rejected file", async () => {
+    expect(parseValidation(clone()).schema_version).toBe(1);
+    const bad = clone();
+    bad.schema_version = 2;
+    render(<App client={fakeClient()} validationLoader={() => Promise.resolve(bad)} />);
+    const section = await screen.findByRole("region", { name: "How the model performed on held-out weeks" });
+    await within(section).findByText("The saved evaluation data is not available");
+    expect(section.querySelector(".valid-num")).toBeNull();
   });
 });

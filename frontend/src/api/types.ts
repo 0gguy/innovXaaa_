@@ -81,3 +81,42 @@ export interface AllForecastsResponse {
   count: number;
   forecasts: Forecast[];
 }
+
+// Static validation-error data exported by ml/tools/export_validation_errors.py
+// (frontend/public/validation/weekly_errors.json). Computed from saved, clipped predictions.
+export interface ValidationWeek {
+  issue_week: string;
+  mae: number;
+  rmse: number;
+  n: number;
+}
+
+export interface ValidationSplit {
+  evaluation_scheme: string;
+  first_issue_week: string;
+  last_issue_week: string;
+  issue_weeks: number;
+  predictions: number;
+  wards_per_week: number;
+  pooled: { mae: number; rmse: number };
+  weekly: ValidationWeek[];
+}
+
+export interface RollingYear {
+  year: number;
+  rows: number;
+  mae: number;
+  rmse: number;
+}
+
+export interface ValidationData {
+  schema_version: number;
+  model_version: string;
+  error_unit: string;
+  prediction_basis: string;
+  pooled_metric_basis: string;
+  data_provenance_note: string;
+  target_window_offset_days: number[];
+  splits: { validation: ValidationSplit; test: ValidationSplit };
+  rolling_origin: { evaluation_scheme: string; years: RollingYear[] };
+}

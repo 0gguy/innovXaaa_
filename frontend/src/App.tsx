@@ -4,6 +4,7 @@ import type { Meta } from "./api/types";
 import { Controls, type Selection } from "./components/Controls";
 import { Methodology } from "./components/Methodology";
 import { Overview } from "./components/Overview";
+import { ValidationDashboard, type ValidationLoader } from "./components/ValidationDashboard";
 import { ErrorPanel, LoadingPanel } from "./components/StatusPanel";
 import { WardDetail } from "./components/WardDetail";
 import { I18nProvider, useI18n } from "./i18n/I18n";
@@ -39,7 +40,7 @@ function LanguageSwitch() {
   );
 }
 
-function Dashboard({ injected }: { injected?: ApiClient }) {
+function Dashboard({ injected, validationLoader }: { injected?: ApiClient; validationLoader?: ValidationLoader }) {
   const { t, lang, date } = useI18n();
   const client = useMemo(() => injected ?? createClient(), [injected]);
   const metaReq = useRequest<Meta>("meta", (signal) => client.meta(signal));
@@ -121,16 +122,17 @@ function Dashboard({ injected }: { injected?: ApiClient }) {
             />
           </>
         )}
+        <ValidationDashboard issueDate={selection?.date ?? null} loader={validationLoader} />
         <Methodology meta={meta} />
       </main>
     </>
   );
 }
 
-export default function App({ client }: { client?: ApiClient }) {
+export default function App({ client, validationLoader }: { client?: ApiClient; validationLoader?: ValidationLoader }) {
   return (
     <I18nProvider>
-      <Dashboard injected={client} />
+      <Dashboard injected={client} validationLoader={validationLoader} />
     </I18nProvider>
   );
 }
