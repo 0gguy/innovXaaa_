@@ -256,12 +256,10 @@ suggestions, debugging, testing and documentation. In detail:
 
 - **Claude:** the FastAPI backend, React frontend, model integration, automated tests, browser checks and
   documentation drafts. 
-- **Claude and Claude Browser:** the dataset analysis, the XGBoost workflow, evaluation and the model report, and
-  general development use, as stated by the team.
-- **Claude Code skills** (`frontend-design`, `impeccable`, `unslop`) gave design guidance and a lint check; they
-  are instructions, not separate models. Playwright CLI ran browser tests and is not an AI model.
+- **Claude skills** (`frontend-design`, `impeccable`, `unslop`) gave design guidance and a lint check; they
+  are instructions, not separate models. Playwright CLI was also used which is not an AI model.
 - **ChatGPT image generation (OpenAI)** made the hero illustration, `frontend/public/images/dengue-hero-bg.webp`
-  (prompt not recorded). It is not a photograph.
+  (prompt not recorded).
 
 The team guided the project, reviewed the outputs and authorized the commits. The project was not written
 entirely by hand, and commits carry no AI co-author trailers. **The running app uses no external AI APIs** and
