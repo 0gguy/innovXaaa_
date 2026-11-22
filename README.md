@@ -6,6 +6,14 @@ Built for the EDU AI Engineering Hackathon 2026 (Phase 1: "AI for Urban Dengue O
 > **This is a historical-replay prototype.** The model runs on bundled weekly records that end on
 > 2025-12-29. It is not a live 2026 forecast, not an official warning system and not a clinical tool.
 > Risk tiers and alerts are our own model-defined categories.
+> ## Live demo
+
+- **Dashboard:** <https://dengue-outlook-dashboard.onrender.com>
+- **API (health check):** <https://dengue-outlook-api.onrender.com/health>
+- **API docs (Swagger):** <https://dengue-outlook-api.onrender.com/docs>
+
+The API runs on Render's free tier and sleeps after about 15 minutes idle. If the dashboard shows a connection
+error or loads slowly at first, open the health link above, wait about a minute, then reload the dashboard.
 
 ## The problem
 
