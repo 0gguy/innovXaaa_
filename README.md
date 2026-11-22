@@ -1,25 +1,29 @@
 # Dengue Outlook
 
-**Ward-level dengue forecasting for Bangladesh's city corporations, replayed from historical data.**
-Built for the EDU AI Engineering Hackathon 2026, Phase 1 challenge "AI for Urban Dengue Outbreak".
+Ward-level dengue forecasts for five Bangladesh city corporations, replayed from historical data.
+Built for the EDU AI Engineering Hackathon 2026 (Phase 1: "AI for Urban Dengue Outbreak").
 
-> **Historical replay prototype.** All forecasts are produced by a trained model replaying bundled
-> weekly records that end on 2025-12-29. This is **not** a live 2026 outbreak forecast, **not** an
-> official public-health warning system, and **not** a clinical decision tool. Risk tiers and alerts
-> are provisional, model-defined categories.
+> **This is a historical-replay prototype.** The model runs on bundled weekly records that end on
+> 2025-12-29. It is not a live 2026 forecast, not an official warning system and not a clinical tool.
+> Risk tiers and alerts are our own model-defined categories.
 
-## 1. Project overview
+## The problem
 
-Dengue outbreaks in Dhaka and Chattogram arrive after a lag: rain fills drains and containers, mosquitoes
-breed, and cases appear weeks later. City corporations that react to hospital admissions act late. The
-hackathon brief asks for a prototype that turns weather data into a **2-to-4-week early-warning window** for
-individual wards.
+The brief's premise is that weather changes show up in dengue cases a few weeks later, so waiting for hospital
+numbers means acting late. It asks for a prototype that turns weather data into a 2-to-4-week early-warning
+window for individual wards.
 
-Dengue Outlook is that prototype. For any of **60 wards in 5 city corporations** and any historical Monday
-issue week it estimates the **combined number of dengue cases in weeks +2, +3 and +4**, assigns one of four
-risk tiers, flags an early alert, and shows which input groups (rainfall, humidity, temperature, recent
-cases, ward vulnerability, season) pushed the estimate up or down. The intended audience is public-health
-officers; because the data are historical, the application demonstrates the method, not live decisions.
+## What it does
+
+For any of 60 wards and any historical Monday (the "issue week"), the app estimates the combined number of
+dengue cases in weeks +2, +3 and +4. It also shows:
+
+- a risk tier (Low, Medium, High, Critical) and an early-alert flag;
+- the cases that were actually recorded later, for comparison;
+- which input groups (rainfall, humidity, temperature, recent cases, ward traits, season) pushed the estimate up
+  or down;
+- all 60 wards for the same week, in five city charts and a searchable list;
+- how the model did on past weeks (validation dashboard), in English or Bangla.
 
 | City corporation | Wards |
 | --- | --- |
@@ -29,436 +33,262 @@ officers; because the data are historical, the application demonstrates the meth
 | Gazipur | 5 |
 | Narayanganj | 5 |
 
-## 2. Quick start (Windows PowerShell)
+## Run it locally (Windows PowerShell)
 
-**Verified with Python 3.13.1 and Node.js 24 (npm 11) on Windows 10.** Other versions were not tested.
-The application needs no internet access, API keys, database or model download once dependencies are
-installed; installing the dependencies itself needs internet access for any package that is not cached. A
-fresh-clone check of these commands is recorded below.
+Tested with Python 3.13.1 and Node.js 24 (npm 11) on Windows 10. Other versions were not tried. Installing
+dependencies needs internet; running the app does not (no API keys, database or model download).
 
 ```powershell
-# 1. Get the code
 git clone https://github.com/0gguy/innovXaaa_.git
 cd innovXaaa_
 
-# 2. Python environment (ML + backend share one environment)
+# Python environment (backend and ML share one)
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1          # if blocked: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 python -m pip install -r backend\requirements.txt -r ml\requirements.txt
 
-# 3. Start the API (terminal 1, from the repository root)
+# Terminal 1: API
 cd backend
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
 ```
 
-Wait until the log says the application has started, then check <http://127.0.0.1:8000/health>. It should
-return `{"status":"ok","api_ready":true,"model_ready":true,"mode":"historical_replay"}`.
-
-Open a **second** PowerShell window in the repository root:
+When the log says the application has started, <http://127.0.0.1:8000/health> should return
+`{"status":"ok","api_ready":true,"model_ready":true,"mode":"historical_replay"}`. Then, in a second PowerShell
+window at the repository root:
 
 ```powershell
-# 4. Start the dashboard (terminal 2)
+# Terminal 2: dashboard
 cd frontend
 npm install
 npm run dev
 ```
 
-Open **<http://127.0.0.1:5173>**. The default view is Dhaka North, DNCC Ward 12, issue week of 28 Jul 2025.
+Open <http://127.0.0.1:5173>. The default view is Dhaka North, DNCC Ward 12, issue week of 28 Jul 2025.
 
-| Item | Value |
+- API docs (Swagger) are at <http://127.0.0.1:8000/docs>.
+- The backend only accepts browser requests from `localhost` / `127.0.0.1` on ports 3000 and 5173. Change this
+  with `DENGUE_CORS_ORIGINS`.
+- The frontend reads the API address from `VITE_API_BASE_URL` (default `http://127.0.0.1:8000`, see
+  `frontend/.env.example`).
+- All versions are pinned in [`backend/requirements.txt`](backend/requirements.txt),
+  [`ml/requirements.txt`](ml/requirements.txt) and [`frontend/package-lock.json`](frontend/package-lock.json).
+
+**How long setup takes.** One fresh-clone run of commit `4eb71a6` on a Windows 10 machine, with empty pip and
+npm caches, took about 103 s: clone 13 s, virtual environment 4 s, `pip install` 76 s, `npm install` 7 s, servers
+ready in about 3 s. Ports 8000 and 5173 were busy, so that run used 8001 and 3000. It was a single run, and
+timings depend on the machine and the network.
+
+## Data
+
+The dataset is `ml/data/dengue_dataset.csv`: 31,320 rows, 60 wards x 522 consecutive weeks (Mondays,
+2016-01-04 to 2025-12-29). Columns are weekly temperature (average, max, min), rainfall, relative humidity,
+dengue cases, and three fixed ward attributes (population density, water-logging risk, sanitation score). There
+are no missing values or duplicate ward-weeks. The team got it from the organizers' Google Sheet linked in the
+brief.
+
+**The data probably is not real surveillance data.** We found signs that it is simulated:
+
+- maximum and minimum temperature are identical in all 60 wards every week;
+- weekly rainfall correlates at 0.991 or more between every pair of wards, even across cities;
+- cases are close to zero from November to March.
+
+## Features
+
+`ml/features.py` builds the inputs, and both training and the API use it. For issue week *t* it uses only
+information from week *t* and earlier:
+
+- week-*t* weather: temperature (average, max, min), rainfall, humidity;
+- rainfall, temperature and humidity lags of 1 to 4 weeks, and rainfall sums over the previous 2, 3 and 4 weeks;
+- dengue case counts from weeks t-1 to t-4 and their 4-week mean (week *t*'s own cases are left out);
+- month (sine and cosine), the three ward attributes, and city and ward identity.
+
+That is 30 numeric and 2 categorical inputs, or 95 columns after one-hot encoding. Lags are exact calendar
+shifts inside one ward, so a ward never sees another ward's history. A forecast needs 4 earlier weeks, so the
+first valid issue week is 2016-02-01.
+
+The target is the sum of cases in weeks t+2, t+3 and t+4 for the same ward: one combined number, not three
+weekly forecasts.
+
+## Model
+
+We use an XGBoost regressor (500 trees, learning rate 0.03, max depth 5). It had the lowest validation MAE of
+the four models we compared, and it supports exact TreeSHAP explanations.
+
+| Model | Validation MAE |
 | --- | --- |
-| Backend | `http://127.0.0.1:8000` (Swagger UI at `/docs`) |
-| Frontend | `http://127.0.0.1:5173` |
-| CORS | The backend allows only `localhost` / `127.0.0.1` on ports 3000 and 5173 (GET and OPTIONS, no credentials). Override with the `DENGUE_CORS_ORIGINS` environment variable; `*` is ignored. |
-| API URL for the frontend | `VITE_API_BASE_URL`, default `http://127.0.0.1:8000` (see `frontend/.env.example`) |
+| XGBoost | 2.1371 |
+| Hist Gradient Boosting | 2.2004 |
+| Extra Trees | 2.2503 |
+| Random Forest | 2.5142 |
+| Predict the mean | 10.2024 |
 
-Dependency files: [`backend/requirements.txt`](backend/requirements.txt),
-[`ml/requirements.txt`](ml/requirements.txt) and [`frontend/package.json`](frontend/package.json) with
-[`frontend/package-lock.json`](frontend/package-lock.json). All versions are pinned.
+We also tried a log1p target, sample weights, adding week-*t* cases, and a randomized search (25 settings, 4
+chronological folds). None beat the validation MAE of 2.1371. Details are in
+[`ml/model_report.md`](ml/model_report.md).
 
-**Fresh-clone verification (22 November 2026).** On Windows 10 with Python 3.13.1 and Node.js 24.11.1, the
-commands above were applied to a new clone of the published GitHub commit `922f1b8` in a temporary folder, with a new
-virtual environment and empty pip and npm caches (the venv's `python.exe` was called directly instead of
-`Activate.ps1`). No source files were edited. The full fresh setup, measured from just before `git clone` until
-`/health` reported `model_ready: true` and the dashboard server answered, took **61.2 seconds** (clone 6 s,
-virtual environment 4 s, `pip install` 40 s, `npm install` 8 s), below the brief's 180-second target. This is
-one run on one machine and network; other machines may be slower, and the dependency downloads need internet. A
-separate **warm start** with dependencies already installed took 2.9 seconds; it is not a setup time. The
-test checked out application commit `922f1b8` and used the setup instructions from the root README that was
-committed afterwards. The documentation itself was not part of that tested checkout, and the commit that adds it
-was not itself cloned and tested. The later frontend redesign described in section 3 (ward charts, English/Bangla
-switch, hero image, redesigned forecast card and methodology) and the chronological validation dashboard (section 6)
-came after that test and were **not** included in the 61.2-second measurement.
+**Split.** Weeks are split by time, never at random, with a 4-week gap before each cutoff so that no target
+window reaches into the next period:
 
-## 3. Features
+| Period | Issue weeks | Rows |
+| --- | --- | --- |
+| Train | 2016-02-01 to 2022-11-21 | 21,360 |
+| Validation | 2022-12-26 to 2024-05-13 | 4,380 |
+| Test | 2024-06-17 to 2025-12-01 | 4,620 |
 
-All of the following are implemented and covered by the tests described in section 8.
+The final model is refitted on train plus validation (25,740 rows). Validation was used to choose the model and
+the alert threshold. The test period is the held-out evaluation. The saved files do not show how many times the
+test set was evaluated.
 
-- **Weather-lag feature pipeline** (`ml/features.py`): per-ward lags of rainfall, temperature and humidity
-  for 1 to 4 weeks, rolling rainfall sums over 2, 3 and 4 weeks, recent-case lags, and seasonality.
-- **Trained XGBoost regression model** with dynamic inference for any ward and historical issue week.
-- **Four risk tiers** (Low, Medium, High, Critical) and an **early alert** (predicted combined cases > 25).
-- **FastAPI backend** with four read-only endpoints and consistent JSON errors.
-- **React + TypeScript dashboard:** city, ward and issue-week selectors; a ward forecast card that leads with the
-  estimated combined cases, the risk tier on a four-band scale and the early-alert status; the observed outcome
-  shown beside the forecast as a historical comparison; and plain-language "what shaped this estimate" contributions
-  (TreeSHAP groups that raised or lowered the estimate, with a collapsed technical-detail box and a note that they
-  are attributions, not causes).
-- **Five city-wise ward bar charts:** one chart per city corporation (Chattogram 10 wards, Dhaka North 20, Dhaka
-  South 20, Gazipur 5, Narayanganj 5; 60 bars in total). Each bar is one ward: the X axis is the ward number and the
-  Y axis is the predicted combined dengue cases for weeks +2 to +4 for the selected issue week, on one shared scale
-  so cities can be compared. Bars are coloured by the backend's risk tier, early-alert wards carry a bell and a
-  dashed line marks the alert threshold. Hovering or focusing a bar shows its ward, cases, tier and alert status;
-  clicking it opens that ward's forecast. The selected ward has an outlined bar and a dark label, and the 20-ward
-  charts scroll sideways on narrow screens. Below the charts, the all-ward summary, a per-city breakdown and a
-  searchable, sortable ward list remain. The charts are **not a map**: no ward coordinates or boundaries exist in the
-  data, and bar order has no geographic meaning.
-- **English | বাংলা switch:** the whole interface can be switched between English and Bangla without reloading;
-  the selected city, ward and week are kept and no new API requests are made. Bangla text uses a font already
-  installed on the device (no Bangla font file is bundled yet), and the Bangla wording has not been reviewed by a
-  native speaker.
-- **Chronological validation dashboard:** a section that charts the saved weekly forecast errors (MAE or RMSE) of
-  the model over the held-out Test weeks or the Validation weeks, with pooled reference values, a keyboard-operable
-  chart, a table alternative and a separate yearly rolling-origin panel. It reads a static local JSON file, not the
-  backend, and is described in section 6.
-- **Methodology and limits section:** four short blocks (how the model works, understanding the forecast, risk tiers
-  and the early alert, accuracy and limits) with expandable technical detail. It keeps the false-alert counts, the
-  absence of prediction intervals, the uncertain data provenance and the non-causal nature of TreeSHAP visible.
-- **Hero background:** a subtle, locally bundled, AI-generated illustration (`frontend/public/images/dengue-hero-bg.webp`)
-  behind the header at 55% opacity over the deep teal, which remains the fallback. It is an illustrative visual,
-  not a photograph of a real outbreak (see section 10). The "Not a live warning system" historical-replay notice
-  stays in the header.
-- **Windows-compatible portable model loading** (`ml/predict_portable.py`) with SHA-256 artifact checks.
-- Handled UI states: loading, backend unreachable, model unavailable, per-request errors with retry, and
-  stale-response protection when selections change quickly.
+**Risk tiers and alert.** On the predicted total *p* (clipped at 0): Low `p < 4.5`, Medium `4.5 <= p < 14.5`,
+High `14.5 <= p < 30.5`, Critical `p >= 30.5`. The early alert is raised when `p > 25`, the value with the best
+validation F1 for spotting observed totals above 30. These are provisional bands on absolute case counts, not
+official thresholds.
 
-## 4. Architecture overview
+## Results
+
+On the 4,620 test ward-weeks (clipped predictions, as the API serves them), in cases per ward per 3-week window:
+
+- MAE 2.776, RMSE 4.922, R-squared 0.813. Without clipping: MAE 2.786, RMSE 4.923.
+- A seasonal baseline (ward x week-of-year average) has MAE 3.223, so the model is 13.9% lower. Repeating last
+  week's cases three times gives 7.220.
+- Exact risk tier right 81.3% of the time, and within one tier 99.2%.
+- Validation MAE and RMSE were 2.137 and 4.373. They look better partly because validation also guided
+  model and threshold choice.
+
+The early alert on test (predicted above 25 versus observed above 30) has precision 0.357 and recall 0.866. It
+fired 649 times: 232 were real, 417 were false alerts, and it missed 36 of the 268 ward-weeks above 30.
+
+Known weaknesses: the model over-forecasts June (+4.3 cases on average) and September (+3.5), tends to
+under-forecast the largest outbreaks, and error varies by city (MAE 2.59 for Narayanganj to 3.23 for Gazipur).
+There are no prediction intervals.
+
+## The website
+
+- **Controls:** city, ward and issue week. The ward card shows the estimate, tier, alert and the weeks it covers.
+  It also shows the observed later total and the difference. Observed values are never model inputs.
+- **What shaped this estimate:** TreeSHAP contributions grouped into 8 input groups, in cases. They explain how
+  the model reached its number; they do not show that rain or heat causes dengue.
+- **Five city charts and a ward list:** one bar per ward, on a shared scale, coloured by tier, with a bell and a
+  dashed line for the alert level. A click or Enter selects the ward. The list can be searched, filtered by city
+  and sorted. The charts are not a map.
+- **English / Bangla** switch without reloading. The Bangla text uses a font already on the device and has not
+  been reviewed by a native speaker.
+- **Validation dashboard:** weekly MAE or RMSE for the Test weeks (default) or the Validation weeks, with the
+  pooled value as a dashed line, a table of the same numbers, and a separate yearly rolling-origin table. Pooled
+  RMSE is computed over all rows, not by averaging weekly RMSEs. Validation results carry a note that they may be
+  optimistic.
+- **Methodology and limits** section at the bottom.
+
+The validation dashboard reads a static file, `frontend/public/validation/weekly_errors.json`, built from the
+saved predictions in `ml/eval/`. It does not run the model or use the backend. To check or rebuild it (standard
+library only, no retraining):
+
+```powershell
+python ml/tools/export_validation_errors.py --check   # read-only: is the committed JSON up to date?
+python ml/tools/export_validation_errors.py           # regenerate it
+```
+
+## API
+
+Read-only `GET` endpoints. Every response has `"mode": "historical_replay"`. `issue_date` must be a Monday from
+2016-02-01 to 2025-12-29, and observed outcomes exist only up to 2025-12-01.
+
+- `/health`: API status and whether the model loaded.
+- `/meta`: cities, wards, valid weeks, tier edges, alert threshold, model version.
+- `/forecast/{ward_id}?issue_date=YYYY-MM-DD&include_drivers=true`: one ward.
+- `/forecast?issue_date=YYYY-MM-DD&include_drivers=false`: all 60 wards.
+
+Example: <http://127.0.0.1:8000/forecast/DNCC_Ward_12?issue_date=2025-07-28>. Errors use
+`{"error": {"code", "message"}}` (400, 404, 422, 503 or 500); see [`backend/README.md`](backend/README.md).
+
+## Tests
+
+```powershell
+cd backend; python -m pytest -q; cd ..                                                   # 36 tests
+python -m pytest ml\tests\test_portable_api.py ml\tests\test_portable_equivalence.py -q  # 48 tests
+python -m pytest ml/tools/tests -q -p no:cacheprovider                                   # 12 tests (exporter)
+cd frontend; npm test; npm run typecheck; npm run lint; npm run build                    # 127 tests
+```
+
+All of these passed in our last runs (backend, ML and exporter in the fresh clone of `4eb71a6`, frontend just
+before the latest UI commit). They are our own checks, not independent testing.
+
+The supported runtime on Windows is `ml/predict_portable.py`, which loads the trained model from native XGBoost
+files; the equivalence tests check that its predictions match the original pipeline. The original joblib loader
+(`ml/predict.py`, tested by `ml/tests/test_package.py`) does not load on our Windows setup, so ignore that test
+file there.
+
+## Project layout
 
 ```text
-Historical dataset                         ml/data/dengue_dataset.csv  (60 wards x 522 weeks)
-        |  ml/features.py  (per-ward lags, rolling sums, calendar features)
-        v
-Trained XGBoost model                      ml/dengue_xgboost_model.ubj (+ .json fallback)
-        |  ml/predict_portable.py  (hash-checked, loaded once)
-        v
-FastAPI backend (backend/app)              /health  /meta  /forecast/{ward_id}  /forecast
-        |  JSON over HTTP on 127.0.0.1:8000
-        v
-React dashboard (frontend/src)             http://127.0.0.1:5173
+backend/app/        FastAPI app (routes, model loading, errors)
+ml/                 features.py, model files, predict_portable.py, model_config.json, model_report.md
+ml/data/            dengue_dataset.csv
+ml/eval/            saved evaluation predictions and metrics
+ml/tools/           portable model export, validation-data exporter and its tests
+frontend/src/       React + TypeScript app (components, API client, English/Bangla text)
+frontend/public/    hero image, validation/weekly_errors.json
+ARCHITECTURE.md     short technical report
 ```
 
-At backend startup the portable forecaster is loaded once, builds the feature table from the bundled CSV,
-and then serves every request from memory. The browser only calls the local backend, plus one static file served
-with the frontend (`frontend/public/validation/weekly_errors.json`) for the validation dashboard (section 6); there
-is no extra backend endpoint for it.
-A fuller write-up (Mermaid diagram, validation split, model-selection rationale and cost controls) is in
+## Team and Git history
+
+Responsibilities as given by the team:
+
+- **Masnoon Mohammad Tahseen Islam:** architecture and planning, FastAPI backend, React frontend, portable model
+  integration, API tests, end-to-end checks, GitHub coordination.
+- **Muhammad Asir Hossain Chowdhury:** dataset analysis, machine-learning workflow, XGBoost development and
+  evaluation, model documentation and artifacts, portable model export.
+- **S.M. Gazi Salauddin Chowdhury:** experimental weather-lag preprocessing and Random Forest training,
+  documentation and presentation.
+
+Individual commits are in the repository history (the team says the GitHub account `0gguy` is Masnoon's). The
+experimental weather-lag and Random Forest work is on the separate branches
+[`feat/weather-lag-pipeline`](https://github.com/0gguy/innovXaaa_/tree/feat/weather-lag-pipeline) and
+[`feat/train-dengue-model`](https://github.com/0gguy/innovXaaa_/tree/feat/train-dengue-model). It is not merged
+and is not part of the running app, which uses the XGBoost model described above. Documentation and
+presentation work is not visible in Git.
+
+## AI tools
+
+AI assistance: Claude and Claude Code (Anthropic) were used for development support, including code
+suggestions, debugging, testing and documentation. In detail:
+
+- **Claude Code:** the FastAPI backend, React frontend, model integration, automated tests, browser checks and
+  documentation drafts (including this README). Claude Sonnet 5.5 was used for the backend, frontend,
+  integration and documentation; the model used in earlier sessions was not recorded.
+- **Claude and Claude Browser:** the dataset analysis, the XGBoost workflow, evaluation and the model report, and
+  general development use, as stated by the team.
+- **Claude Code skills** (`frontend-design`, `impeccable`, `unslop`) gave design guidance and a lint check; they
+  are instructions, not separate models. Playwright CLI ran browser tests and is not an AI model.
+- **ChatGPT image generation (OpenAI)** made the hero illustration, `frontend/public/images/dengue-hero-bg.webp`
+  (prompt not recorded). It is not a photograph.
+
+The team guided the project, reviewed the outputs and authorized the commits. The project was not written
+entirely by hand, and commits carry no AI co-author trailers. **The running app uses no external AI APIs** and
+makes no calls to weather or other hosted services. Compute and runtime details are in
 [`ARCHITECTURE.md`](ARCHITECTURE.md).
+## Limitations and future work
 
-## 5. Forecasting methodology
+- Historical replay only. Nothing here predicts 2026 or a current outbreak.
+- The data appear simulated, so accuracy on real surveillance data is unknown.
+- Tiers and the alert threshold are our own choices on raw case counts. The alert gives many false alarms on
+  the test period.
+- No prediction intervals, and the driver bars are not causal.
+- Validation numbers are optimistic because validation helped choose the model and threshold.
+- Not implemented: real surveillance data, live weather input, uncertainty ranges, a map with ward boundaries,
+  expert-defined thresholds, a bundled Bangla font and a native-speaker review of the Bangla text.
 
-Details and checks are in [`ml/model_report.md`](ml/model_report.md).
+## More documentation
 
-- **Data:** 31,320 rows, 60 wards x 522 consecutive weeks (Mondays 2016-01-04 to 2025-12-29), with
-  `avg_temp_c`, `max_temp_c`, `min_temp_c`, `rainfall_mm`, `relative_humidity_pct`, `dengue_cases` and
-  three static ward attributes (`population_density_sqkm`, `water_logging_risk_index`, `sanitation_score`).
-- **Target:** the sum of cases in weeks t+2, t+3 and t+4 for the same ward, where *t* is the issue week
-  (one combined number, not three weekly forecasts).
-- **Features (32 model inputs):** week-*t* weather; weather lags for t-1 to t-4; rolling rainfall sums over
-  2, 3 and 4 weeks; case lags for t-1 to t-4 and a 4-week case mean; month (sine and cosine); the static ward
-  attributes; and city and ward identity. Week *t*'s own case count is excluded. All lags are computed
-  within one ward, so no ward sees another ward's history.
-- **Chronological validation:** issue weeks are split by time with a 4-week purge before each cutoff.
-
-  | Period | Issue weeks | Rows |
-  | --- | --- | --- |
-  | Train | 2016-02-01 to 2022-11-21 | 21,360 |
-  | Validation | 2022-12-26 to 2024-05-13 | 4,380 |
-  | Test | 2024-06-17 to 2025-12-01 | 4,620 |
-
-  The final model is refitted on train plus validation (25,740 rows). The later test period is kept separate from
-  model and alert-threshold selection (which used validation) and is the primary reported evaluation. The saved
-  artifacts do not independently establish how many times the test set was evaluated.
-- **Model selection (validation MAE):** XGBoost 2.137, Hist Gradient Boosting 2.200, Extra Trees 2.250,
-  Random Forest 2.514, mean baseline 10.202.
-- **Risk tiers** on the predicted combined total *p* (clipped at 0): Low `p < 4.5`; Medium `4.5 <= p < 14.5`;
-  High `14.5 <= p < 30.5`; Critical `p >= 30.5`. These are provisional, model-defined bands on absolute case
-  counts, not clinical or official thresholds.
-- **Early alert:** raised when predicted combined cases are **above 25**. The cut-off was chosen as the best
-  validation F1 for detecting observed totals above 30.
-- **Driver explanations:** XGBoost TreeSHAP attributions, grouped into 8 input groups. They describe how the
-  model reached its number; they are not causal effects.
-
-## 6. Model evaluation
-
-All figures come from the held-out **test period: 4,620 ward-weeks** (60 wards x 77 issue weeks, 2024-06-17 to
-2025-12-01), as recorded in [`ml/eval/metrics_summary.json`](ml/eval/metrics_summary.json) and
-`ml/model_report.md`.
-
-| Measure (combined weeks +2 to +4 cases) | Test result |
-| --- | --- |
-| MAE (clipped at 0, as served) | 2.776 |
-| RMSE (clipped, as served) | 4.922 |
-| R-squared | 0.813 |
-| Seasonal baseline MAE (ward x week-of-year mean) | 3.223 (model is 13.9% lower after clipping) |
-| Last-week persistence MAE (3 x last week) | 7.220 |
-| Exact risk-tier accuracy | 0.813 (within one tier: 0.992) |
-
-For reference, the unclipped (raw) model output scores MAE 2.786, RMSE 4.923 and R-squared 0.813; the table
-reports the clipped predictions the application serves.
-
-**Early alert** (predicted > 25 versus an observed total > 30): precision 0.357, recall 0.866, F1 0.506.
-The alert fired 649 times: 232 for ward-weeks whose observed total exceeded 30, 417 for ones that did not.
-It missed 36 of the 268 ward-weeks above 30. On validation the same rule had precision 0.722 and
-recall 0.857.
-
-Known weaknesses recorded in the project report: the model over-forecast June (mean bias +4.3 cases) and
-September (+3.5) in the test period; it tends to under-forecast the largest outbreaks; Medium is the weakest
-tier; and error varies by city (MAE 2.59 for Narayanganj to 3.23 for Gazipur) and by year. No confidence
-intervals are reported or claimed.
-
-### Chronological validation dashboard
-
-The dashboard's "How the model performed on held-out weeks" section shows how far the model's forecasts were from
-what was recorded, week by week, in time order. It is built from the **saved evaluation predictions** in
-`ml/eval/`. It runs no new inference and uses no live surveillance data.
-
-- **What each bar is.** One bar per **issue week**: the error across that week's **60 ward predictions**. The
-  target is the combined dengue cases for weeks t+2, t+3 and t+4, so errors are in cases, **not percentages**.
-- **Controls.** *Test (held out)* or *Validation* chooses the period; *MAE* or *RMSE* chooses the measure. Test is
-  the default. A dashed reference line and the headline figures show the **pooled** MAE and RMSE over every
-  prediction in the chosen period. Pooled RMSE is **not** the average of the weekly RMSE values. A table gives the
-  same weekly values as text, and the chart can be stepped through with the arrow keys.
-- **Rolling-origin panel.** A separately labelled yearly table (2020 to 2025) comes from a different scheme in
-  which the model is retrained each year. It is never mixed with the Validation or Test figures.
-- **English and Bangla.** The section is available in both languages (Bangla wording not reviewed by a native
-  speaker).
-
-| Period | Issue weeks | Predictions | Pooled MAE | Pooled RMSE | Model used |
-| --- | --- | --- | --- | --- | --- |
-| Validation | 73 (2022-12-26 to 2024-05-13) | 4,380 | 2.1371 | 4.3730 | Trained on the training period only |
-| Test | 77 (2024-06-17 to 2025-12-01) | 4,620 | 2.7762 | 4.9225 | Refitted on train plus validation (per `ml/model_report.md`) |
-
-Values are in combined cases per ward-week and were recomputed from the saved predictions, which hold the
-clipped, as-served values rounded to four decimal places. The generator checks them against
-`ml/eval/metrics_summary.json`.
-
-**How to read it.**
-
-- The validation weeks also helped choose the model and the alert threshold, so Validation results may be
-  **optimistic**. The later held-out Test period is the primary performance evidence.
-- The data appear to be simulated (section 13), so the dashboard does not establish real-world accuracy.
-- It has no prediction intervals, is not a live outbreak warning and does not promise future accuracy. It shows
-  when errors occurred, not why.
-
-**Regenerating the data.** The chart reads the committed file `frontend/public/validation/weekly_errors.json`.
-It is produced by a standard-library Python script (no packages to install, no model is loaded or retrained) that
-reads only the existing CSV and JSON files in `ml/eval/`. Run from the repository root:
-
-```powershell
-python ml/tools/export_validation_errors.py            # regenerate and overwrite the JSON
-python ml/tools/export_validation_errors.py --check    # read-only: confirm the committed JSON is up to date
-```
-
-`--check` writes nothing and fails with a message if the file is missing or differs from a fresh export. The
-script also stops with an error if a saved file breaks one of its checks (row counts, week dates, 60 identical
-wards in every week, the validation model label, or a pooled metric that disagrees with `metrics_summary.json`).
-The `ml/eval` files must stay unchanged. The page additionally validates the JSON in the browser and shows a safe
-"not available" message if it is malformed.
-
-## 7. API endpoints
-
-All endpoints are read-only `GET` requests. Responses carry `"mode": "historical_replay"` and a limitation
-notice. `issue_date` must be a **Monday** in `YYYY-MM-DD` form between **2016-02-01 and 2025-12-29**.
-
-| Endpoint | Purpose |
-| --- | --- |
-| `GET /health` | API availability and whether the portable model actually loaded (`api_ready`, `model_ready`, `mode`). |
-| `GET /meta` | Cities, all 60 wards, valid issue-week range, tier edges, alert threshold, model version. |
-| `GET /forecast/{ward_id}?issue_date=YYYY-MM-DD&include_drivers=true` | One ward: predicted combined cases, `risk_tier`, `early_alert`, forecast weeks, driver contributions and, when available, the observed outcome for comparison. |
-| `GET /forecast?issue_date=YYYY-MM-DD&include_drivers=false` | All 60 wards for one issue week. |
-
-Example: `http://127.0.0.1:8000/forecast/DNCC_Ward_12?issue_date=2025-07-28`
-
-Errors use `{"error": {"code", "message"}}`: 400 `invalid_date`, 404 `unknown_ward` or
-`issue_week_out_of_range`, 422 `insufficient_history` / `invalid_input` / `validation_error`, 503
-`model_unavailable`, 500 `internal_error`. Observed outcomes exist only for issue weeks up to 2025-12-01.
-See [`backend/README.md`](backend/README.md) for details.
-
-## 8. Testing
-
-Run from PowerShell with the virtual environment active. Results below were observed on Windows 10 when this
-README was written.
-
-```powershell
-# Backend (36 tests: foundation, endpoints, error handling, CORS, model integration)
-cd backend
-python -m pytest -q
-cd ..
-
-# Portable ML package (48 tests, from the repository root)
-python -m pytest ml\tests\test_portable_api.py ml\tests\test_portable_equivalence.py -q
-
-# Frontend (112 tests with the validation dashboard), type checking, linting and production build
-cd frontend
-npm test
-npm run typecheck
-npm run lint
-npm run build
-cd ..
-
-# Validation-dashboard exporter (12 tests, from the repository root) and its read-only freshness check
-python -m pytest ml/tools/tests -q -p no:cacheprovider
-python ml/tools/export_validation_errors.py --check
-```
-
-| Suite | Observed result |
-| --- | --- |
-| Backend | 36 passed |
-| Portable ML | 48 passed |
-| Frontend, published baseline (commit `922f1b8`) | 34 passed; `typecheck` and `lint` exit 0; `build` succeeded |
-| Frontend, redesigned (local commit `5a58555`) | 67 passed in 3 test files; `typecheck` and `lint` exit 0; `build` succeeded (verified on the redesigned code before that commit was created) |
-| Frontend, redesigned with the validation dashboard (local commit `ba34cac`) | 112 passed in 3 test files; `typecheck`, `lint` and `build` succeeded (re-run before that commit was created) |
-| Validation-dashboard exporter (latest audit) | 12 passed; `--check` reported the JSON up to date |
-
-The same suites were run again in the fresh clone described in section 2, which contained the earlier frontend
-(backend 36 passed, portable ML 48 passed, frontend 34 passed; `typecheck`, `lint` and `build` succeeded), without
-the legacy ML test file. The 67-test and 112-test frontend results come from later code and were not part of that
-fresh clone. The 112-test frontend result (with `typecheck`, `lint` and `build`) was re-run before commit `ba34cac`
-was created; no tests were run again for this documentation update (only the exporter `--check` was). The
-12 exporter tests are the result of the latest audit. A real-browser
-check in that clone, on the earlier frontend, confirmed the Historical replay labelling, five cities and 60 wards, the DNCC Ward 12 forecast
-(Critical tier, early alert raised) with its driver breakdown for 28 Jul 2025, and no console errors. These are the
-project's own checks, not independent certification.
-
-**Known failing on Windows:** `ml/tests/test_package.py` tests the original `predict.py` loader, which
-deserializes a combined scikit-learn/XGBoost joblib file that fails on this Windows setup (`XGBoostError: input
-stream corrupted`). Do not use it as a pass/fail signal on Windows. The default Windows path in this repository
-is `ml/predict_portable.py`, which loads the same trained model from native XGBoost files; the portable
-equivalence tests check that its predictions match the original pipeline.
-
-## 9. Team contributions
-
-Responsibilities below were provided by the team. The "Git history" column records only what the repository
-history on `main` and the two feature branches shows; it is not a measure of effort.
-
-| Member | Responsibilities (team-provided) | Git history |
-| --- | --- | --- |
-| **Masnoon Mohammad Tahseen Islam** | Application architecture and planning; FastAPI backend; React + TypeScript frontend; portable XGBoost model integration; API implementation and testing; end-to-end integration and browser verification; GitHub integration and coordination. | Git author metadata shows two names with the same e-mail address: `Masnoon Mohammad Tahseen Islam` (6 commits, each deleting files: `predict.py`, `model_config.json`, `model_report.md`, `integration_guide.md`, `requirements-notebook.txt` and a `requirements.txt`) and `0gguy` (6 commits as of `996cb06`: portable inference, backend foundation, model integration, frontend and two documentation commits). Git records only these names and the shared e-mail address; that both belong to this member is stated by the team, not verified by Git. |
-| **Muhammad Asir Hossain Chowdhury** | Dataset analysis and exploration; machine-learning workflow; XGBoost development and evaluation; model documentation and artifacts; portable model export and compatibility work. | 14 commits on `main`: 3 file uploads (the last one adds the ML package: dataset, notebook, `features.py`, trained model, evaluation files, model report, integration guide), 1 README creation and 10 file or directory deletions. |
-| **S.M. Gazi Salauddin Chowdhury** | Experimental weather-lag preprocessing; experimental Random Forest training and validation; documentation and presentation. | 2 commits, **only on separate feature branches** (below), not on `main`. Documentation and presentation work is not visible in Git. |
-
-Experimental branches (not merged, not part of the deployed application):
-
-- [`feat/weather-lag-pipeline`](https://github.com/0gguy/innovXaaa_/tree/feat/weather-lag-pipeline): a weather-lag preprocessing script and processed dataset.
-- [`feat/train-dengue-model`](https://github.com/0gguy/innovXaaa_/tree/feat/train-dengue-model): a Random Forest trained on a chronological split of that processed data.
-
-That experiment predicts a single week's cases with different features and tier cut-offs; it is **not
-deployed**. **The deployed model is the XGBoost model described above**, and the experiment's MAE must not be
-compared with the XGBoost combined-horizon MAE.
-
-As of commit `996cb06`, every commit on `main` was made between 00:03 and 02:40 on 2026-11-22 (Bangladesh time),
-and both feature-branch commits fall in the same night (about 00:08 and 00:18). The public history therefore
-does not show activity spread across the full 24-hour window, and reflects repository consolidation more than the
-pace of the underlying work.
-
-## 10. AI tools and development disclosure
-
-AI assistants were used during development. They are **not** part of the running application.
-
-| Tool | Used for |
-| --- | --- |
-| **Claude Code** (Anthropic). The backend, frontend, backend-to-model integration and root documentation were done with Claude Sonnet 5.5; the model version for earlier sessions, including the portable-loader package, was not recorded | Programming assistance for the FastAPI backend, React/TypeScript frontend, portable model integration, automated tests, browser verification and documentation drafting. |
-| **Claude Browser** | Used by the team during development, as stated by the team. |
-| **AI-assisted analysis and modeling workflow** (Claude) | Dataset analysis, the XGBoost modeling workflow, model evaluation and model documentation, as stated by the team. The exact tool versions for these earlier sessions were not recorded in the repository. |
-| Claude Code skills: `frontend-design`, `impeccable`, `unslop` | Written design guidance loaded into Claude Code, plus a local design-lint check (`impeccable`). They are instructions and tooling, not separate AI models or external APIs. |
-| Playwright CLI | Local browser-automation tool used by Claude Code for browser testing. It is not an AI model. |
-| **OpenAI ChatGPT image generation** (prompt not recorded in the repository) | The hero background image `frontend/public/images/dengue-hero-bg.webp`. It is an illustrative, AI-generated visual, **not a photograph** of a real event or outbreak, and no photographic source or image licence is claimed for it. |
-
-**Runtime external APIs: none.** The running application makes no calls to AI services, weather services or
-other hosted APIs. The organizer's dataset (a Google Sheet linked in the brief) was obtained during
-development and is bundled as `ml/data/dengue_dataset.csv`.
-
-The team directed the work, reviewed the generated code and reports, and authorized the commits made through
-Claude Code. The test suites and browser checks were executed by Claude Code in those sessions, and their results
-are reported here as observed, not as independent validation. The project was not written entirely by hand. AI
-assistance is disclosed here in the documentation; commits carry no AI co-author trailers.
-
-## 11. Runtime and cost controls
-
-Verified in the code and tests:
-
-- **Local inference only.** No paid or hosted inference API, no LLM calls, no external weather or data
-  service, no database, no authentication.
-- **Model loaded once.** The FastAPI lifespan loads the portable forecaster at startup; requests reuse it
-  (a test asserts the loader runs once and is not repeated per request).
-- **Conservative threads.** The backend defaults `OMP_NUM_THREADS=1` and sets XGBoost `n_jobs=1`.
-- **Single-worker localhost demo.** The documented command binds `127.0.0.1` with `--workers 1` and no
-  auto-reload. These come from the command line, not from code defaults.
-- **Fewer requests from the UI.** One request for the selected ward and one batched request for all wards per
-  issue week; newer selections cancel older requests.
-- **Integrity.** Model artifacts are checked against SHA-256 hashes in `ml/portable_manifest.json` on load.
-
-Latency figures in `ml/integration_guide.md` (about 7 ms for one ward and 17 ms for all 60 wards, 1.35 s startup)
-were measured on a 2-vCPU Linux environment, not on this Windows setup.
-
-## 12. Demo and submission
-
-The official brief (Phase 1, 24-hour remote qualifier, 21 November 2:00 PM BST to 22 November 2:00 PM BST)
-scores eight criteria out of 100 and allows up to 5 bonus points. In outline it asks for:
-
-- A public GitHub repository with a dependency file and `README.md` commands that launch the app locally in
-  3 minutes or less.
-- A programmatic multi-week weather-lag pipeline, computed per `ward_id`.
-- A trained model that produces dynamic predictions with Low, Medium, High and Critical tiers.
-- A working web dashboard with a clear driver breakdown.
-- A root `ARCHITECTURE.md` (1 to 2 pages) with a data-flow diagram, the chronological validation split and
-  the model-selection rationale, plus documented API-call and cost controls.
-- An uncut screen recording of at most 3:00 on localhost or a deployed URL, with voiceover and no slides.
-- Distributed commits across team members and an explicit list of AI assistants and external APIs (section 10).
-
-The brief's "Submission Link" field is blank in the copy the team received; follow the organizers'
-instructions for how to submit.
-
-**Status of submission items:** this README, the AI disclosure and [`ARCHITECTURE.md`](ARCHITECTURE.md) are
-written. The demo video is **not yet recorded**. A fresh-clone launch check of the published
-application code (the earlier frontend, before the redesign) was run once (section 2): 61.2 seconds to readiness
-on one machine, below the 3-minute target. No bonus extension is claimed for confidence intervals or a geographic
-heat map; the ward bar charts are not a map. The chronological validation dashboard (section 6) is an
-evaluation view of saved predictions, not a claim of verified real-world accuracy.
-
-To demo: follow the Quick start, then walk through selecting a city, ward and issue week; the ward forecast,
-tier, early alert and the contributions that shaped the estimate; the observed-outcome comparison; the five city
-bar charts and the ward list; the English/Bangla switch; the validation dashboard (Test and Validation, MAE and
-RMSE); and the limitations section.
-
-## 13. Limitations
-
-- **Historical replay.** The data end on 2025-12-29. Nothing here predicts 2026 or any current outbreak.
-- **Dataset provenance.** The project report finds the data appear simulated: maximum and minimum
-  temperatures are identical across wards each week, and weekly rainfall correlates at 0.991 or higher between
-  every pair of wards, so ward differences come mostly from the static attributes. Results describe
-  performance on this dataset, not real surveillance.
-- **Provisional tiers.** Risk bands and the alert cut-off are model-defined on absolute case counts (no
-  population data for incidence) and are not official thresholds.
-- **Model uncertainty.** The alert has low precision on the test period (many false alerts), the model
-  under-forecasts the largest outbreaks, and it is biased high in June and September. There are no
-  confidence intervals.
-- **Validation figures may be optimistic.** The validation period helped choose the model and the alert
-  threshold; the held-out test period is the primary evidence. The validation dashboard shows saved historical
-  errors only.
-- **No official warnings.** Outputs need review by public-health professionals before any use.
-- **Driver bars are attributions, not causes.** They show how the model reached a number.
-
-## 14. Further documentation
-
-| Document | Contents |
-| --- | --- |
-| [`ARCHITECTURE.md`](ARCHITECTURE.md) | Diagram, features and target, chronological validation, tiers, API flow and compute controls. |
-| [`backend/README.md`](backend/README.md) | Backend setup, endpoints, errors, CORS and runtime controls. |
-| [`frontend/README.md`](frontend/README.md) | Dashboard setup, commands, features and API behaviour. |
-| [`ml/model_report.md`](ml/model_report.md) | Data, features, validation design, model selection, metrics and limitations. |
-| [`ml/integration_guide.md`](ml/integration_guide.md) | Output schema, risk tiers, error codes. **Its examples import the original `predict.py` loader, which does not work on Windows; use `predict_portable.py`.** |
-| [`ml/README_WINDOWS.md`](ml/README_WINDOWS.md) | Portable-loader handoff. **Its status line ("not verified on Windows") predates the Windows verification recorded here.** |
-| [`ml/compatibility_report.md`](ml/compatibility_report.md) | Equivalence evidence between the original and portable models. |
-| [`ml/model_config.json`](ml/model_config.json), [`ml/portable_manifest.json`](ml/portable_manifest.json) | Model configuration, tiers, thresholds and artifact hashes. |
-| [`ml/README.md`](ml/README.md) | Original ML package notes. **Its `predict.py` commands and 37-test suite target the original loader and fail on Windows.** |
+- [`ARCHITECTURE.md`](ARCHITECTURE.md): data flow, validation, API and compute.
+- [`backend/README.md`](backend/README.md) and [`frontend/README.md`](frontend/README.md): component setup and
+  details.
+- [`ml/model_report.md`](ml/model_report.md): data, features, split, model selection and metrics.
+- [`ml/model_config.json`](ml/model_config.json) and [`ml/portable_manifest.json`](ml/portable_manifest.json):
+  tiers, thresholds and artifact hashes.
+- [`ml/compatibility_report.md`](ml/compatibility_report.md): original versus portable model equivalence.
+- Older ML notes: [`ml/integration_guide.md`](ml/integration_guide.md) examples use the original loader,
+  [`ml/README.md`](ml/README.md) targets the same loader and its 37-test suite, and
+  [`ml/README_WINDOWS.md`](ml/README_WINDOWS.md) still says "not verified on Windows". None of these works on
+  Windows as written; use `predict_portable.py`.
