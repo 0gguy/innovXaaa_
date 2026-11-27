@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import APP_MODE, APP_TITLE, APP_VERSION, REPLAY_NOTICE, get_cors_origins
 from .errors import register_error_handlers
-from .model_service import ModelService, load_portable_forecaster
+from .model_service import ModelService, load_portable_forecaster, load_weekly_companion
 from .schemas import HealthResponse
 
 
@@ -13,9 +13,13 @@ def _envelope(**payload) -> dict:
     return {"mode": APP_MODE, "notice": REPLAY_NOTICE, **payload}
 
 
-def create_app(model_loader=load_portable_forecaster) -> FastAPI:
-    """Build the app. `model_loader` is a test hook; the model loads once, at startup."""
-    service = ModelService(model_loader)
+def create_app(model_loader=load_portable_forecaster, weekly_loader=load_weekly_companion) -> FastAPI:
+    """Build the app. `model_loader` / `weekly_loader` are test hooks; models load once, at startup.
+
+    The weekly companion is optional: if `weekly_loader` fails (or is None) Phase 1 is unaffected
+    and weekly values use the equal split, reported as source "equal_split".
+    """
+    service = ModelService(model_loader, weekly_loader)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -61,16 +65,26 @@ def create_app(model_loader=load_portable_forecaster) -> FastAPI:
                 "rule": f.config["risk_tiers"]["rule"],
             },
             early_alert={"threshold": f.alert_threshold, "rule": f.config["early_alert"]["rule"]},
+            weekly_companion=service.weekly_info(),
         )
 
+    # include_weekly (default false) adds a `weekly` block to each forecast: the same ward and issue
+    # week, split into t+2, t+3, t+4 and reconciled to predicted_cases_3wk. Without it, responses are
+    # exactly as before.
     @app.get("/forecast/{ward_id}")
-    def forecast_ward(ward_id: str, issue_date: str = Query(...), include_drivers: bool = True) -> dict:
+    def forecast_ward(ward_id: str, issue_date: str = Query(...), include_drivers: bool = True,
+                      include_weekly: bool = False) -> dict:
         result = service.call("forecast", ward_id, issue_date, include_drivers=include_drivers)
+        if include_weekly:
+            service.attach_weekly([result])
         return _envelope(forecast=result)
 
     @app.get("/forecast")
-    def forecast_all(issue_date: str = Query(...), include_drivers: bool = False) -> dict:
+    def forecast_all(issue_date: str = Query(...), include_drivers: bool = False,
+                     include_weekly: bool = False) -> dict:
         results = service.call("forecast_all", issue_date, include_drivers=include_drivers)
+        if include_weekly:
+            service.attach_weekly(results)
         return _envelope(issue_date=issue_date, count=len(results), forecasts=results)
 
     return app
