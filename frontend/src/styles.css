@@ -2471,3 +2471,220 @@ html[lang="bn"] .valid-num {
     padding: 36px 36px;
   }
 }
+
+/* ---------- resource planning ---------- */
+/* Same card language as the weekly outlook. Figures are the planning service's; shortfalls are marked in
+   words and with the critical-tier red as text, never colour alone. The ward table scrolls inside its own
+   region on narrow screens so the page itself never scrolls sideways. */
+.planning {
+  display: grid;
+  gap: 20px;
+  padding: 20px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  min-width: 0;
+}
+.planning > * {
+  min-width: 0;
+}
+.planning-apply {
+  display: grid;
+  gap: 8px;
+}
+.planning-draft {
+  max-width: 70ch;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--ink-2);
+}
+.planning-draft:empty {
+  display: none;
+}
+.planning-results {
+  display: grid;
+  gap: 28px;
+  min-width: 0;
+}
+.planning-applied {
+  max-width: 72ch;
+  padding: 10px 14px;
+  font-size: 0.9375rem;
+  color: var(--ink);
+  background: var(--aqua-soft);
+  border-radius: var(--r-ctl);
+}
+.planning-block {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.planning-block-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.planning-cards,
+.planning-cities {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  min-width: 0;
+}
+.planning-card,
+.planning-city {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-ctl);
+  min-width: 0;
+}
+.planning-unit,
+.planning-city-meta,
+.planning-card-note {
+  font-size: 0.875rem;
+  color: var(--ink-3);
+}
+.planning-dl {
+  display: grid;
+  gap: 4px;
+}
+.planning-dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.9375rem;
+}
+.planning-dl dt {
+  color: var(--ink-2);
+}
+.planning-dl dd {
+  margin: 0;
+  font-weight: 700;
+  text-align: right;
+}
+.planning-dl > .is-short dd,
+.planning-dl > .is-short dt {
+  color: var(--crit-bg);
+}
+.planning-table-wrap {
+  overflow-x: auto;
+  min-width: 0;
+  border-radius: var(--r-ctl);
+}
+.planning-table {
+  min-width: 40rem;
+}
+.planning-table th[scope="row"] {
+  min-width: 9rem;
+}
+.planning-table .row-alert {
+  display: block;
+}
+.planning-status {
+  font-size: 0.875rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.planning-status-no_deficit {
+  color: var(--ink-3);
+}
+.planning-status-partial,
+.planning-status-below_floor {
+  color: var(--crit-bg);
+}
+.planning-details > div,
+.planning-details > p {
+  padding: 10px 14px;
+}
+.planning-details h4 {
+  margin: 8px 0 4px;
+}
+.planning-list {
+  display: grid;
+  gap: 4px;
+  padding-left: 1.2em;
+  list-style: disc;
+  font-size: 0.9375rem;
+  color: var(--ink-2);
+}
+@media (min-width: 640px) {
+  .planning {
+    padding: 28px 24px;
+  }
+}
+@media (min-width: 960px) {
+  .planning {
+    padding: 36px 36px;
+  }
+}
+
+/* ---------- hospital, intervention and dispatch views ---------- */
+/* Reuse the planning card language. The dispatch draft is shown as inert, wrapping plain text inside its own
+   scroller; nothing here adds colours, shadows or motion. */
+.planning-options {
+  display: grid;
+  gap: 12px 16px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  align-items: end;
+  min-width: 0;
+}
+.planning-options .weekly-note {
+  grid-column: 1 / -1;
+}
+.planning-warning {
+  max-width: 72ch;
+  padding: 10px 14px;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--crit-bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-ctl);
+}
+.planning-draft-label {
+  max-width: 72ch;
+  padding: 10px 14px;
+  font-size: 0.9375rem;
+  background: var(--aqua-soft);
+  border-radius: var(--r-ctl);
+}
+.planning-table td.is-short-cell {
+  font-weight: 700;
+  color: var(--crit-bg);
+}
+.planning-compare tr.is-key th,
+.planning-compare tr.is-key td {
+  font-weight: 700;
+  color: var(--teal);
+}
+.planning-moves {
+  max-width: 70ch;
+}
+.dispatch-preview {
+  margin: 0;
+  max-height: 32rem;
+  overflow: auto;
+  padding: 14px 16px;
+  font-family: var(--sans);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--r-ctl);
+  min-width: 0;
+}
+.dispatch-downloads {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+}
+a.btn {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}

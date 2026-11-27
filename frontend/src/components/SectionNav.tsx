@@ -27,10 +27,10 @@ export interface SectionDef {
 export const SECTIONS: readonly SectionDef[] = [
   { id: "overview", available: true },
   { id: "weekly", available: true },
-  { id: "resources", available: false, body: "resourcesBody" },
-  { id: "hospitals", available: false, body: "hospitalsBody" },
-  { id: "interventions", available: false, body: "interventionsBody" },
-  { id: "dispatch", available: false, body: "dispatchBody" },
+  { id: "resources", available: true },
+  { id: "hospitals", available: true },
+  { id: "interventions", available: true },
+  { id: "dispatch", available: true },
 ];
 
 export function isSectionAvailable(id: SectionId): boolean {
@@ -69,6 +69,7 @@ export function SectionNav({ current, onSelect }: { current: SectionId; onSelect
             ),
           )}
         </ul>
+        {planned.length > 0 && (
         <details className="section-plans">
           <summary>{t.nav.plansSummary}</summary>
           <div className="section-plans-body">
@@ -83,6 +84,7 @@ export function SectionNav({ current, onSelect }: { current: SectionId; onSelect
             </dl>
           </div>
         </details>
+        )}
       </div>
     </nav>
   );

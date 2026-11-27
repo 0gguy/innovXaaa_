@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { createClient, type ApiClient } from "./api/client";
+import { createClient, type ApiClient, type PlanningApiClient } from "./api/client";
 import type { Meta } from "./api/types";
 import { Controls, type Selection } from "./components/Controls";
 import { closeAllInfoPopovers } from "./components/InfoButton";
@@ -9,6 +9,10 @@ import { ValidationDashboard, type ValidationLoader } from "./components/Validat
 import { isSectionAvailable, SectionNav, type SectionId } from "./components/SectionNav";
 import { ErrorPanel, LoadingPanel } from "./components/StatusPanel";
 import { WardDetail } from "./components/WardDetail";
+import { DispatchBrief, type DispatchApi } from "./components/DispatchBrief";
+import { HospitalPlanning } from "./components/HospitalPlanning";
+import { InterventionExplorer } from "./components/InterventionExplorer";
+import { ResourcePlanning } from "./components/ResourcePlanning";
 import { WeeklyOutlook } from "./components/WeeklyOutlook";
 import { I18nProvider, useI18n } from "./i18n/I18n";
 import { weeksBetween } from "./lib/dates";
@@ -43,9 +47,22 @@ function LanguageSwitch() {
   );
 }
 
-function Dashboard({ injected, validationLoader }: { injected?: ApiClient; validationLoader?: ValidationLoader }) {
+/** The real client has the planning methods; an injected test client may not, and planning views then say so. */
+type DashboardClient = ApiClient & Partial<PlanningApiClient>;
+
+function Dashboard({ injected, validationLoader }: { injected?: DashboardClient; validationLoader?: ValidationLoader }) {
   const { t, lang, date } = useI18n();
-  const client = useMemo(() => injected ?? createClient(), [injected]);
+  const client: DashboardClient = useMemo(() => injected ?? createClient(), [injected]);
+  const allocate = useMemo(() => (client.allocation ? client.allocation.bind(client) : null), [client]);
+  const route = useMemo(() => (client.hospitalRouting ? client.hospitalRouting.bind(client) : null), [client]);
+  const simulate = useMemo(() => (client.interventionSimulation ? client.interventionSimulation.bind(client) : null), [client]);
+  const dispatchApi = useMemo<DispatchApi | null>(
+    () =>
+      client.dispatchDocument && client.dispatchBriefUrl
+        ? { document: client.dispatchDocument.bind(client), url: client.dispatchBriefUrl.bind(client) }
+        : null,
+    [client],
+  );
   const metaReq = useRequest<Meta>("meta", (signal) => client.meta(signal));
   const meta = metaReq.data;
 
@@ -140,6 +157,14 @@ function Dashboard({ injected, validationLoader }: { injected?: ApiClient; valid
               </>
             )}
             {section === "weekly" && <WeeklyOutlook client={client} meta={meta} selection={selection} />}
+            {section === "resources" && (
+              <ResourcePlanning allocate={allocate} meta={meta} selection={selection} baseUrl={client.baseUrl} />
+            )}
+            {section === "hospitals" && <HospitalPlanning route={route} meta={meta} selection={selection} baseUrl={client.baseUrl} />}
+            {section === "interventions" && (
+              <InterventionExplorer simulate={simulate} meta={meta} selection={selection} baseUrl={client.baseUrl} />
+            )}
+            {section === "dispatch" && <DispatchBrief api={dispatchApi} meta={meta} selection={selection} baseUrl={client.baseUrl} />}
           </>
         )}
         {section === "overview" && (
@@ -153,7 +178,7 @@ function Dashboard({ injected, validationLoader }: { injected?: ApiClient; valid
   );
 }
 
-export default function App({ client, validationLoader }: { client?: ApiClient; validationLoader?: ValidationLoader }) {
+export default function App({ client, validationLoader }: { client?: DashboardClient; validationLoader?: ValidationLoader }) {
   return (
     <I18nProvider>
       <Dashboard injected={client} validationLoader={validationLoader} />

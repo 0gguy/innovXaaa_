@@ -19,7 +19,7 @@ afterEach(() => {
 });
 
 const DEFAULT_DATE = "2025-07-28";
-const PLANNED: SectionId[] = ["resources", "hospitals", "interventions", "dispatch"];
+const ALL: SectionId[] = ["overview", "weekly", "resources", "hospitals", "interventions", "dispatch"];
 
 function renderNav(onSelect: (id: SectionId) => void = () => {}, lang: "en" | "bn" = "en") {
   return render(
@@ -29,8 +29,7 @@ function renderNav(onSelect: (id: SectionId) => void = () => {}, lang: "en" | "b
   );
 }
 const nav = () => screen.getByRole("navigation", { name: en.nav.label });
-const plannedItem = (id: SectionId) => document.querySelector(`.section-tab-item.is-planned[data-section="${id}"]`) as HTMLElement;
-const plannedLabel = (id: SectionId) => plannedItem(id).querySelector(".section-tab-label") as HTMLElement;
+const navButton = (id: SectionId) => within(nav()).getByRole("button", { name: en.nav[id] });
 
 function counted() {
   const meta = vi.fn(() => Promise.resolve(makeMeta()));
@@ -41,7 +40,7 @@ function counted() {
 async function readyApp() {
   const c = counted();
   render(<App client={c.client} />);
-  await screen.findByRole("heading", { name: "DNCC Ward 12" });
+  await screen.findByRole("heading", { name: "DNCC Ward 12" }, { timeout: 3000 });
   await screen.findByRole("region", { name: /All 8 wards/ });
   return c;
 }
@@ -52,50 +51,31 @@ async function readStyles(): Promise<string> {
 
 // ---------------------------------------------------------------- structure and availability
 describe("section navigation structure", () => {
-  it("lists all six sections in order; Overview and Weekly Outlook are available and Overview is current", () => {
+  it("lists all six sections in order, all available, with Overview current", () => {
     renderNav();
     const items = within(nav()).getAllByRole("listitem");
-    expect(items.map((li) => li.querySelector(".section-tab, .section-tab-label")?.textContent)).toEqual([
-      en.nav.overview,
-      en.nav.weekly,
-      en.nav.resources,
-      en.nav.hospitals,
-      en.nav.interventions,
-      en.nav.dispatch,
-    ]);
-    expect(SECTIONS.filter((s) => s.available).map((s) => s.id)).toEqual(["overview", "weekly"]);
-    const overview = within(nav()).getByRole("button", { name: en.nav.overview });
-    expect(overview).toHaveAttribute("aria-current", "page");
-    expect(overview).toHaveAttribute("type", "button");
-    const weekly = within(nav()).getByRole("button", { name: en.nav.weekly });
-    expect(weekly).not.toHaveAttribute("aria-current");
-    expect(weekly).toHaveAttribute("type", "button");
-  });
-
-  it("marks every planned section visibly and accessibly as not yet available", () => {
-    renderNav();
-    for (const id of PLANNED) {
-      const item = plannedItem(id);
-      expect(item).toHaveTextContent(en.nav[id]);
-      expect(item.querySelector(".section-tab-status")).toHaveTextContent(en.nav.planned);
-      // the accessible text keeps name and status apart: "Weekly Outlook, Not yet available"
-      expect(item.textContent).toBe(`${en.nav[id]}, ${en.nav.planned}`);
-      expect(isSectionAvailable(id)).toBe(false);
+    expect(items.map((li) => li.querySelector(".section-tab, .section-tab-label")?.textContent)).toEqual(ALL.map((id) => en.nav[id]));
+    expect(SECTIONS.filter((s) => s.available).map((s) => s.id)).toEqual(ALL);
+    for (const id of ALL) {
+      expect(isSectionAvailable(id)).toBe(true);
+      const b = navButton(id);
+      expect(b).toHaveAttribute("type", "button");
+      if (id === "overview") expect(b).toHaveAttribute("aria-current", "page");
+      else expect(b).not.toHaveAttribute("aria-current");
     }
-    expect(within(nav()).getAllByText(en.nav.planned)).toHaveLength(4);
   });
 
-  it("never exposes a planned section as a control: no buttons, links, disabled or focusable stand-ins", () => {
+  it("leaves no section marked as not yet available", () => {
     renderNav();
-    expect(within(nav()).getAllByRole("button")).toHaveLength(2); // Overview and Weekly Outlook only
+    expect(document.querySelector(".section-tab-item.is-planned")).toBeNull();
+    expect(within(nav()).queryAllByText(en.nav.planned)).toHaveLength(0);
+  });
+
+  it("exposes exactly six enabled buttons and no links or disabled stand-ins", () => {
+    renderNav();
+    expect(within(nav()).getAllByRole("button")).toHaveLength(6);
     expect(within(nav()).queryAllByRole("link")).toHaveLength(0);
-    for (const id of PLANNED) {
-      const item = plannedItem(id);
-      expect(item.querySelector("button, a, input, [tabindex]")).toBeNull();
-      expect(item).not.toHaveAttribute("aria-disabled");
-      expect(item).not.toHaveAttribute("aria-current");
-    }
-    expect(nav().querySelector("[disabled]")).toBeNull();
+    expect(nav().querySelector("[disabled], [aria-disabled]")).toBeNull();
   });
 
   it("does not claim tab semantics it does not implement", () => {
@@ -105,28 +85,17 @@ describe("section navigation structure", () => {
     expect(screen.queryByRole("tabpanel")).toBeNull();
   });
 
-  it("shows no pretend content for planned sections: no numbers, tables, charts or progress", () => {
+  it("shows no data in the strip itself: no numbers, tables, charts or progress", () => {
     renderNav();
     const n = nav();
     expect(n.querySelector("table, svg, img, canvas, progress, [role='status'], [role='progressbar'], [aria-busy]")).toBeNull();
     expect(n.textContent).not.toMatch(/[0-9০-৯]/);
   });
 
-  it("explains each planned section in a native disclosure that needs no hover or disabled focus", async () => {
-    const user = userEvent.setup();
+  it("drops the planned-sections disclosure once every section works", () => {
     renderNav();
-    const details = nav().querySelector("details")!;
-    expect(details.open).toBe(false);
-    const summary = within(nav()).getByText(en.nav.plansSummary);
-    await user.click(summary);
-    expect(details.open).toBe(true);
-    expect(details).toHaveTextContent(en.nav.plansLead);
-    const terms = Array.from(details.querySelectorAll("dt")).map((d) => d.textContent);
-    expect(terms).toEqual(PLANNED.map((id) => en.nav[id]));
-    for (const body of [en.nav.resourcesBody, en.nav.hospitalsBody, en.nav.interventionsBody, en.nav.dispatchBody]) {
-      expect(details).toHaveTextContent(body);
-    }
-    expect(details).not.toHaveTextContent(en.nav.weeklyBody); // available now, so no longer listed as planned
+    expect(nav().querySelector("details")).toBeNull();
+    expect(within(nav()).queryByText(en.nav.plansSummary)).toBeNull();
   });
 
   it("has no nested buttons and gives every control a name", () => {
@@ -141,25 +110,22 @@ describe("section navigation structure", () => {
 
 // ---------------------------------------------------------------- keyboard and activation
 describe("section navigation keyboard and activation", () => {
-  it("reaches Overview and the disclosure with Tab and activates them natively with Enter and Space", async () => {
+  it("reaches every section with Tab and activates them natively with Enter and Space", async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();
     renderNav(onSelect);
     await user.tab();
-    const overview = within(nav()).getByRole("button", { name: en.nav.overview });
-    expect(overview).toHaveFocus();
+    expect(navButton("overview")).toHaveFocus();
     await user.keyboard("{Enter}");
     await user.keyboard(" ");
     expect(onSelect).toHaveBeenCalledTimes(2);
     expect(onSelect).toHaveBeenLastCalledWith("overview");
-    await user.tab();
-    expect(within(nav()).getByRole("button", { name: en.nav.weekly })).toHaveFocus();
-    await user.keyboard("{Enter}");
-    expect(onSelect).toHaveBeenLastCalledWith("weekly");
-    await user.tab();
-    const summary = within(nav()).getByText(en.nav.plansSummary);
-    expect(summary).toHaveFocus(); // planned items are skipped: they are text, not stops
-    expect(summary.tagName).toBe("SUMMARY"); // native disclosure: Enter/Space toggling is the browser's own (jsdom does not emulate it; checked in a real browser)
+    for (const id of ALL.slice(1)) {
+      await user.tab();
+      expect(navButton(id)).toHaveFocus();
+      await user.keyboard("{Enter}");
+      expect(onSelect).toHaveBeenLastCalledWith(id);
+    }
     await user.tab();
     expect(document.body).toHaveFocus(); // nothing traps focus inside the strip
   });
@@ -174,9 +140,7 @@ describe("section navigation keyboard and activation", () => {
         </form>
       </I18nProvider>,
     );
-    await user.click(screen.getByRole("button", { name: en.nav.overview }));
-    await user.click(screen.getByRole("button", { name: en.nav.weekly }));
-    await user.click(plannedLabel("resources"));
+    for (const id of ALL) await user.click(screen.getByRole("button", { name: en.nav[id] }));
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
@@ -215,9 +179,8 @@ describe("section navigation translations", () => {
     for (const [k, v] of Object.entries(bn.nav)) expect(/[ঀ-৿]/.test(v), k).toBe(true);
     renderNav(() => {}, "bn");
     const n = screen.getByRole("navigation", { name: bn.nav.label });
+    expect(within(n).getAllByRole("button").map((b) => b.textContent)).toEqual(ALL.map((id) => bn.nav[id]));
     expect(within(n).getByRole("button", { name: bn.nav.overview })).toHaveAttribute("aria-current", "page");
-    for (const id of PLANNED) expect(plannedItem(id)).toHaveTextContent(`${bn.nav[id]}, ${bn.nav.planned}`);
-    expect(within(n).getByText(bn.nav.plansSummary)).toBeInTheDocument();
   });
 
   it("switches language with the existing language buttons without losing the current section", async () => {
@@ -226,7 +189,7 @@ describe("section navigation translations", () => {
     await user.click(screen.getByRole("button", { name: en.langBnLabel }));
     const n = await screen.findByRole("navigation", { name: bn.nav.label });
     expect(within(n).getByRole("button", { name: bn.nav.overview })).toHaveAttribute("aria-current", "page");
-    expect(within(n).getAllByText(bn.nav.planned)).toHaveLength(4);
+    expect(within(n).getAllByRole("button")).toHaveLength(6);
   });
 });
 
@@ -260,7 +223,7 @@ describe("section navigation in the dashboard", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
     const detailEl = document.querySelector(".detail");
     await user.click(screen.getByRole("button", { name: en.nav.overview }));
-    for (const id of PLANNED) await user.click(plannedLabel(id));
+    await user.click(screen.getByRole("button", { name: en.nav.overview })); // choosing the current section again changes nothing
     expect(trees()).toEqual([1, 1, 1, 1, 1, 1]);
     expect(counts()).toEqual(before);
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -284,13 +247,13 @@ describe("section navigation in the dashboard", () => {
     expect(await screen.findByRole("heading", { name: "DNCC Ward 11" })).toBeInTheDocument();
   });
 
-  it("stays consistent under rapid interaction", async () => {
+  it("stays consistent under rapid switching and never re-requests the Overview forecasts", async () => {
     const c = await readyApp();
     const before = c.forecastAll.mock.calls.length;
     const overview = screen.getByRole("button", { name: en.nav.overview });
     for (let i = 0; i < 25; i++) {
       fireEvent.click(overview);
-      fireEvent.click(plannedLabel(PLANNED[i % PLANNED.length]!));
+      fireEvent.click(navButton(ALL[i % ALL.length]!));
     }
     expect(overview).toHaveAttribute("aria-current", "page");
     expect(nav().querySelectorAll("[aria-current]")).toHaveLength(1);
@@ -319,7 +282,7 @@ describe("section navigation and information popovers", () => {
     expect(meta).toHaveBeenCalledTimes(2);
   });
 
-  it("an open explanation also closes when a planned item is pressed, with the dashboard unchanged", async () => {
+  it("an open explanation also closes on an outside press, with the dashboard unchanged", async () => {
     const user = userEvent.setup();
     const forecastWard = vi.fn(() => Promise.reject(new ApiError("network", "x")));
     const forecastAll = vi.fn((d: string) => Promise.resolve(allFor(d)));
@@ -330,7 +293,7 @@ describe("section navigation and information popovers", () => {
     const calls = [forecastWard.mock.calls.length, forecastAll.mock.calls.length];
     await user.click(info);
     expect(info).toHaveAttribute("aria-expanded", "true");
-    await user.click(plannedLabel("dispatch")); // outside press: the F2A dismissal closes it
+    await user.click(screen.getByRole("heading", { level: 1 })); // outside press: the F2A dismissal closes it
     expect(info).toHaveAttribute("aria-expanded", "false");
     expect(screen.getByRole("button", { name: en.nav.overview })).toHaveAttribute("aria-current", "page");
     expect([forecastWard.mock.calls.length, forecastAll.mock.calls.length]).toEqual(calls);

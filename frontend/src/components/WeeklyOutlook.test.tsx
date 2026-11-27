@@ -61,15 +61,11 @@ async function openWeekly(user = userEvent.setup()) {
 
 // ---------------------------------------------------------------- navigation and the shared selection
 describe("weekly outlook navigation", () => {
-  it("starts on Overview; Weekly Outlook is selectable; the four other sections stay unavailable", async () => {
+  it("starts on Overview and Weekly Outlook is selectable; no section is left unavailable", async () => {
     await readyApp();
     expect(navButton(en.nav.overview)).toHaveAttribute("aria-current", "page");
     expect(navButton(en.nav.weekly)).not.toHaveAttribute("aria-current");
-    for (const id of ["resources", "hospitals", "interventions", "dispatch"] as const) {
-      const item = document.querySelector(`.section-tab-item.is-planned[data-section="${id}"]`);
-      expect(item, id).toHaveTextContent(en.nav.planned);
-      expect(item?.querySelector("button")).toBeNull();
-    }
+    expect(document.querySelector(".section-tab-item.is-planned")).toBeNull();
     await openWeekly();
     expect(navButton(en.nav.weekly)).toHaveAttribute("aria-current", "page");
     expect(navButton(en.nav.overview)).not.toHaveAttribute("aria-current");
