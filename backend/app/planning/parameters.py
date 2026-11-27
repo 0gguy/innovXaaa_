@@ -128,3 +128,47 @@ HOSPITAL_LIMITATIONS = [
     "Bed demand is an expected-value planning proxy with no prediction interval.",
     "Historical replay on data that appear simulated; not an operational transfer plan.",
 ]
+
+# --------------------------------------------------------------------------- intervention simulation (scenario)
+# ASSUMPTIONS from the reviewed handoff (ml_handoff_reviewed, artifacts/parameters.json, sim-params-1.1.0).
+# Not learned from data, not published effect estimates. The dataset contains no intervention records.
+INTERVENTION_SCENARIOS = {"low": 0.15, "base": 0.35, "high": 0.55}   # maximum assumed reduction M
+INTERVENTION_RANKING_SCENARIO = "base"
+INTERVENTION_SATURATION_K = 1.4
+INTERVENTION_RAMP = {2: 0.5, 3: 0.85, 4: 1.0}                          # share of R reached in week t+h
+# Density per crew (12,000) and the 6-crew cap are shared with Task 2 (CREW_DENSITY_PER_CREW, CREW_MAX_PER_WARD).
+
+INTERVENTION_POLICY = {
+    "name": "assumed_effect_scenarios_on_ml_baseline",
+    "causal": False,
+    "effect_size_basis": "assumed_scenario_not_learned",
+    "crew_capacity_status": "hypothetical",
+    "crew_assignment_source": "task2_minimum_coverage_then_risk_priority",
+    "timing": "If crews were deployed in the issue week, effects are assumed to ramp across weeks t+2, t+3 and t+4.",
+    "description": (
+        "coverage = crews / max(1, density / 12000); R = M x (1 - exp(-1.4 x coverage)); weekly reduction = "
+        "R x ramp[h]; scenario_adjusted_cases = baseline x (1 - weekly reduction). The baseline is the ML "
+        "forecast; the reduction is hypothetical scenario arithmetic."
+    ),
+}
+
+INTERVENTION_ASSUMPTIONS = [
+    "Model-driven: only the baseline weekly case forecast (Phase 1 3-week total split into t+2, t+3, t+4).",
+    "Assumed: the low / base / high maximum reductions (15% / 35% / 55%), the saturation constant 1.4, the "
+    "density workload scale (12,000 persons/km2 per crew), the weekly ramp (0.5 / 0.85 / 1.0), and the "
+    "hypothetical crew budget, eligibility and cap (6 per ward).",
+    "Derived scenario outputs: scenario-adjusted cases, projected cases avoided, planning supply and bed "
+    "planning reductions, and projected cases avoided per assigned crew.",
+    "Crews are the Task 2 Minimum Coverage + Risk Priority assignment for the same budget and floor.",
+    "Projected cases avoided per assigned crew is a benefit-per-resource ratio, not a financial return.",
+]
+
+INTERVENTION_LIMITATIONS = [
+    "The simulator applies hypothetical effects to an ML-derived baseline. It does not estimate or establish "
+    "causal effectiveness, actual cases prevented, real resource savings, or actual public-health outcomes.",
+    "No spraying activity, patient outcome or supply use is observed; nothing here has been carried out.",
+    "Wards are treated independently: no mosquito movement, spillover, re-infestation or travel model.",
+    "The baseline is an expected value without prediction intervals (Phase 1 over-predicted the test period "
+    "by about 12.5% in aggregate).",
+    "Historical replay on data that appear simulated.",
+]

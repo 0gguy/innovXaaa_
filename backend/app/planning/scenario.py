@@ -12,8 +12,11 @@ from decimal import ROUND_HALF_UP, Decimal
 
 from . import parameters as P
 from .allocate import Allocation, Claim, allocate, split_budget
-from .demand import PlanningDataError, WardDemand, bed_planning_demand, to_decimal, ward_demand
+from .demand import (PlanningDataError, WardDemand, bed_planning_demand, consumable_demand, to_decimal,
+                     ward_demand)
 from .hospital import WardBeds, city_capacity, headline_week, route_city, summarize, ward_capacities
+from .intervention import (CrewCandidate, first_crew_ranking, marginal_benefit, per_crew, roi_greedy,
+                           ward_effect)
 
 CONSUMABLES = ("saline", "kits")
 
@@ -316,4 +319,262 @@ def build_hospital_routing(forecasts: list[dict], densities: dict, *, capacity_p
         "weeks": weeks_out,
         "headline_week_by_city": headline,
         "wards": ward_out,
+    }
+
+
+# =========================================================================== intervention simulation scenario
+def _r(x: float, places: int) -> float:
+    """Presentation rounding (ROUND_HALF_UP) of an internal full-precision value."""
+    return float(Decimal(repr(float(x))).quantize(Decimal(1).scaleb(-places), rounding=ROUND_HALF_UP))
+
+
+def _ward_resources(p3: Decimal, eff) -> dict:
+    """Integer planning impact for one ward and scenario (Task 2 / Task 3 rounding rules).
+    Consumables: baseline uses the published 3-week forecast (equals GET /allocation); adjusted uses the
+    published total minus the projected avoided cases. Beds: weekly rule per forecast week; peak = max."""
+    p_adj = p3 - Decimal(repr(eff.avoided_total))
+    if p_adj < 0:
+        p_adj = Decimal(0)
+    out = {}
+    for item in ("saline", "kits"):
+        base, adj = consumable_demand(p3, item), consumable_demand(p_adj, item)
+        out[item] = {"baseline_units": base, "scenario_adjusted_units": adj, "projected_units_avoided": base - adj}
+    wb = [bed_planning_demand(to_decimal(x, "baseline weekly cases")) for x in eff.baseline]
+    wa = [bed_planning_demand(to_decimal(x, "adjusted weekly cases")) for x in eff.adjusted]
+    out["weekly_bed_planning_units"] = {"baseline": wb, "scenario_adjusted": wa,
+                                        "projected_units_avoided": [b - a for b, a in zip(wb, wa)]}
+    out["peak_bed_planning_units"] = {"baseline": max(wb), "scenario_adjusted": max(wa),
+                                      "projected_reduction": max(wb) - max(wa)}
+    return out
+
+
+def _empty_totals() -> dict:
+    return {"baseline_cases_3wk": 0.0, "projected_cases_avoided": 0.0, "assigned_crews": 0,
+            "saline": [0, 0], "kits": [0, 0], "beds_base": [0, 0, 0], "beds_adj": [0, 0, 0], "peak_red": 0}
+
+
+def _accumulate(t: dict, p3: float, eff, res: dict) -> None:
+    t["baseline_cases_3wk"] += p3
+    t["projected_cases_avoided"] += eff.avoided_total
+    t["assigned_crews"] += eff.crews
+    for item in ("saline", "kits"):
+        t[item][0] += res[item]["baseline_units"]
+        t[item][1] += res[item]["scenario_adjusted_units"]
+    for k in range(3):
+        t["beds_base"][k] += res["weekly_bed_planning_units"]["baseline"][k]
+        t["beds_adj"][k] += res["weekly_bed_planning_units"]["scenario_adjusted"][k]
+    t["peak_red"] += res["peak_bed_planning_units"]["projected_reduction"]
+
+
+def _merge(into: dict, part: dict) -> None:
+    for k, v in part.items():
+        if isinstance(v, list):
+            into[k] = [a + b for a, b in zip(into[k], v)]
+        else:
+            into[k] += v
+
+
+def _present_totals(t: dict, forecast_weeks: list[str]) -> dict:
+    avoided = t["projected_cases_avoided"]
+    roi = per_crew(avoided, t["assigned_crews"])
+    return {
+        "baseline_cases_3wk": _r(t["baseline_cases_3wk"], 4),
+        "scenario_adjusted_cases_3wk": _r(t["baseline_cases_3wk"] - avoided, 4),
+        "projected_cases_avoided": _r(avoided, 4),
+        "assigned_crews": t["assigned_crews"],
+        "projected_cases_avoided_per_assigned_crew": None if roi is None else _r(roi, 3),
+        "saline": {"baseline_units": t["saline"][0], "scenario_adjusted_units": t["saline"][1],
+                   "projected_units_avoided": t["saline"][0] - t["saline"][1]},
+        "kits": {"baseline_units": t["kits"][0], "scenario_adjusted_units": t["kits"][1],
+                 "projected_units_avoided": t["kits"][0] - t["kits"][1]},
+        "weekly_bed_planning_units": [
+            {"horizon_week": h, "forecast_week": fw, "baseline": b, "scenario_adjusted": a,
+             "projected_units_avoided": b - a}
+            for h, fw, b, a in zip((2, 3, 4), forecast_weeks, t["beds_base"], t["beds_adj"])],
+        "sum_of_ward_peak_bed_planning_reductions": t["peak_red"],
+    }
+
+
+def _scenario_totals(wards, by_city, assigned, base_cases, dens, p3s, m):
+    """Raw (unrounded) city and region totals for one crew assignment and one scenario."""
+    cities = {}
+    for c, ws in by_city.items():
+        t = _empty_totals()
+        for w in ws:
+            eff = ward_effect(base_cases[w.ward_id], assigned[w.ward_id], dens[w.ward_id], m)
+            _accumulate(t, float(p3s[w.ward_id]), eff, _ward_resources(p3s[w.ward_id], eff))
+        cities[c] = t
+    region = _empty_totals()
+    for c in sorted(cities):
+        _merge(region, cities[c])
+    return cities, region
+
+
+def build_intervention_simulation(forecasts: list[dict], densities: dict, *, total_crews: int,
+                                  min_coverage_pct: int, include_roi_alternative: bool = False) -> dict:
+    """Pure function: forecasts (with `weekly`) + densities + crew scenario -> JSON-ready simulation body.
+
+    Crews come from Task 2's build_plan (Minimum Coverage + Risk Priority) for the same budget and floor.
+    Baselines are the Task 1 weekly forecasts; all scenario effects are assumed (causal = false)."""
+    wards = _validated_wards(forecasts, densities)
+    fmap = {f["ward_id"]: f for f in forecasts}
+    week_sets = {tuple(f["forecast_weeks"]) for f in forecasts}
+    if len(week_sets) != 1:
+        raise PlanningDataError("forecasts are not for one common issue week")
+    forecast_weeks = list(week_sets.pop())
+
+    plan = build_plan(forecasts, densities, stock_pct=100, min_coverage_pct=min_coverage_pct,
+                      total_crews=total_crews)
+    crew_rows = {w["ward_id"]: w for w in plan["wards"]}
+    assigned = {wid: r["crews"]["assigned"] for wid, r in crew_rows.items()}
+    caps = {wid: r["crews"]["scenario_demand"] for wid, r in crew_rows.items()}
+    pools = {c["city"]: c["crews"]["pool"] for c in plan["cities"]}
+    region_crews = plan["region"]["crews"]
+
+    by_city: dict[str, list[WardDemand]] = defaultdict(list)
+    for w in wards:
+        by_city[w.city].append(w)
+    for c in by_city:
+        by_city[c].sort(key=WardDemand.priority_key)
+        if sum(assigned[w.ward_id] for w in by_city[c]) != pools[c]:
+            raise PlanningDataError("crew assignment does not match the city crew pool")
+    cities = sorted(by_city)
+    base_cases = {w.ward_id: tuple(float(x["predicted_cases"]) for x in fmap[w.ward_id]["weekly"]["weeks"])
+                  for w in wards}
+    dens = {w.ward_id: float(densities[w.ward_id]) for w in wards}
+    p3s = {w.ward_id: w.predicted_cases_3wk for w in wards}
+    scen = P.INTERVENTION_SCENARIOS
+    m_rank = scen[P.INTERVENTION_RANKING_SCENARIO]
+
+    # ---- primary plan (Task 2 assignment), all scenarios
+    raw = {s: _scenario_totals(wards, by_city, assigned, base_cases, dens, p3s, m) for s, m in scen.items()}
+    scenarios_out = {}
+    for s in scen:
+        city_t, region_t = raw[s]
+        scenarios_out[s] = {
+            "max_reduction": scen[s],
+            "region": _present_totals(region_t, forecast_weeks),
+            "cities": [{"city": c, **_present_totals(city_t[c], forecast_weeks)} for c in cities],
+        }
+
+    # ---- wards
+    ward_out = []
+    for c in cities:
+        for rank, w in enumerate(by_city[c], start=1):
+            wid = w.ward_id
+            cand = CrewCandidate(wid, caps[wid], w.priority_key(), base_cases[wid], dens[wid])
+            nxt = marginal_benefit(cand, assigned[wid], m_rank)
+            res_by_s, baseline_units = {}, None
+            for s, m in scen.items():
+                eff = ward_effect(base_cases[wid], assigned[wid], dens[wid], m)
+                res = _ward_resources(p3s[wid], eff)
+                roi = per_crew(eff.avoided_total, eff.crews)
+                # baseline units are identical in every scenario: published once per ward below
+                baseline_units = {"saline": res["saline"]["baseline_units"], "kits": res["kits"]["baseline_units"],
+                                  "weekly_bed_planning_units": res["weekly_bed_planning_units"]["baseline"],
+                                  "peak_bed_planning_units": res["peak_bed_planning_units"]["baseline"]}
+                res_by_s[s] = {
+                    # the t+4 value equals the ward's maximum assumed reduction R (ramp 1.0)
+                    "effective_reduction_by_week": [_r(x, 6) for x in eff.reductions],
+                    "scenario_adjusted_weekly_cases": [_r(x, 4) for x in eff.adjusted],
+                    "projected_cases_avoided": _r(eff.avoided_total, 4),
+                    "projected_cases_avoided_per_assigned_crew": None if roi is None else _r(roi, 3),
+                    "saline": {k: v for k, v in res["saline"].items() if k != "baseline_units"},
+                    "kits": {k: v for k, v in res["kits"].items() if k != "baseline_units"},
+                    "weekly_bed_planning_units": {k: v for k, v in res["weekly_bed_planning_units"].items()
+                                                  if k != "baseline"},
+                    "peak_bed_planning_units": {k: v for k, v in res["peak_bed_planning_units"].items()
+                                                if k != "baseline"},
+                }
+            cov = ward_effect(base_cases[wid], assigned[wid], dens[wid], m_rank).coverage
+            ward_out.append({
+                "ward_id": wid, "city": c, "priority_rank_in_city": rank, "risk_tier": w.risk_tier,
+                "early_alert": w.early_alert, "population_density_sqkm": crew_rows[wid]["priority"]["population_density_sqkm"],
+                "predicted_cases_3wk": _r(float(w.predicted_cases_3wk), 4),
+                "baseline_weekly_cases": [_r(x, 4) for x in base_cases[wid]],
+                "baseline_planning_units": baseline_units,
+                "crews": {"scenario_demand": caps[wid], "assigned": assigned[wid], "coverage": _r(cov, 4),
+                          "next_crew_status": ("ineligible" if caps[wid] == 0 else
+                                               "at_cap" if assigned[wid] >= caps[wid] else "available"),
+                          "next_crew_projected_cases_avoided_base": None if nxt is None else _r(nxt, 4)},
+                "scenarios": res_by_s,
+            })
+
+    # ---- first-crew ranking (base scenario), all eligible wards
+    cands_all = []
+    for c in cities:
+        cands_all += [CrewCandidate(w.ward_id, caps[w.ward_id], w.priority_key(), base_cases[w.ward_id],
+                                    dens[w.ward_id]) for w in by_city[c]]
+    city_of = {w.ward_id: w.city for w in wards}
+    ranking = [{"rank": i, "ward_id": wid, "city": city_of[wid], "first_crew_projected_cases_avoided": _r(v, 4),
+                "assigned_crews": assigned[wid]}
+               for i, (wid, v) in enumerate(first_crew_ranking(cands_all, m_rank), start=1)]
+
+    # ---- optional hypothetical ROI-oriented alternative (same city pools, same caps)
+    alternative = None
+    if include_roi_alternative:
+        alt = {}
+        for c in cities:
+            cands = [CrewCandidate(w.ward_id, caps[w.ward_id], w.priority_key(), base_cases[w.ward_id],
+                                   dens[w.ward_id]) for w in by_city[c]]
+            alt.update(roi_greedy(cands, pools[c], m_rank))
+        for c in cities:
+            if sum(alt[w.ward_id] for w in by_city[c]) != pools[c]:
+                raise PlanningDataError("alternative crew assignment does not match the city crew pool")
+        comparison = {}
+        for s, m in scen.items():
+            city_t, region_t = _scenario_totals(wards, by_city, alt, base_cases, dens, p3s, m)
+            prim_c, prim_r = raw[s]
+
+            def diff(a, p):
+                d = a["projected_cases_avoided"] - p["projected_cases_avoided"]
+                pct = None if p["projected_cases_avoided"] == 0 else 100 * d / p["projected_cases_avoided"]
+                return {"primary_projected_cases_avoided": _r(p["projected_cases_avoided"], 4),
+                        "alternative_projected_cases_avoided": _r(a["projected_cases_avoided"], 4),
+                        "difference": _r(d, 4), "difference_pct": None if pct is None else _r(pct, 1)}
+
+            comparison[s] = {"region": diff(region_t, prim_r),
+                             "cities": [{"city": c, **diff(city_t[c], prim_c[c])} for c in cities]}
+        alternative = {
+            "status": "hypothetical_assumption_dependent",
+            "objective": "maximise total projected cases avoided (base scenario) per city with marginal-gain greedy; "
+                         "same city pools, same Task 2 ward caps; not a proven best real-world deployment",
+            "ranking_scenario": P.INTERVENTION_RANKING_SCENARIO,
+            "city_pools": {c: pools[c] for c in cities},
+            "assigned_crews": sum(alt.values()),
+            "wards": [{"ward_id": w.ward_id, "city": c, "primary_crews": assigned[w.ward_id],
+                       "alternative_crews": alt[w.ward_id]}
+                      for c in cities for w in by_city[c] if caps[w.ward_id] > 0],
+            "comparison": comparison,
+        }
+
+    warnings = []
+    if wards[0].weekly_source == "equal_split":
+        warnings.append("Weekly companion unavailable: the baseline is an equal split of the 3-week forecast.")
+    if region_crews["unassigned"]:
+        warnings.append(f"{region_crews['unassigned']} crews are unassigned: the budget exceeds hypothetical crew demand.")
+
+    return {
+        "policy": P.INTERVENTION_POLICY,
+        "parameters": {
+            "scenarios": dict(scen), "saturation_k": P.INTERVENTION_SATURATION_K,
+            "density_per_crew_sqkm": P.CREW_DENSITY_PER_CREW, "max_crews_per_ward": P.CREW_MAX_PER_WARD,
+            "ramp_by_horizon_week": {str(h): g for h, g in P.INTERVENTION_RAMP.items()},
+            "total_crews": total_crews, "min_coverage_pct": min_coverage_pct,
+            "include_roi_alternative": include_roi_alternative,
+            "coefficients": {k: str(v) for k, v in P.COEFFICIENTS.items()}, "rounding": P.ROUNDING,
+            "roi_definition": "projected cases avoided over t+2..t+4 / assigned crews (not financial); null if 0 crews",
+        },
+        "weekly_source": wards[0].weekly_source,
+        "forecast_weeks": forecast_weeks,
+        "assumptions": P.INTERVENTION_ASSUMPTIONS,
+        "limitations": P.INTERVENTION_LIMITATIONS,
+        "warnings": warnings,
+        "crews": {"total_crews": region_crews["total_crews"], "scenario_demand": region_crews["scenario_demand"],
+                  "assigned": region_crews["assigned"], "unassigned": region_crews["unassigned"],
+                  "city_pools": {c: pools[c] for c in cities}},
+        "scenarios": scenarios_out,
+        "wards": ward_out,
+        "first_crew_ranking": ranking,
+        "roi_alternative": alternative,
     }

@@ -11,7 +11,8 @@ from .planning import parameters as PP
 from .planning.allocate import AllocationInputError
 from .planning.demand import PlanningDataError
 from .planning.hospital import HospitalInputError
-from .planning.scenario import build_hospital_routing, build_plan
+from .planning.intervention import InterventionInputError
+from .planning.scenario import build_hospital_routing, build_intervention_simulation, build_plan
 from .schemas import HealthResponse
 
 logger = logging.getLogger("dengue_api")
@@ -138,6 +139,30 @@ def create_app(model_loader=load_portable_forecaster, weekly_loader=load_weekly_
             logger.exception("Hospital routing could not be built")
             raise ApiError(500, "planning_data_invalid",
                            "The forecast data could not be converted into a hospital routing plan.") from None
+        return _envelope(issue_date=results[0]["issue_week"], model_version=results[0]["model_version"], **body)
+
+    @app.get("/intervention-simulation")
+    def intervention_simulation(
+        issue_date: str | None = Query(None, description="Monday issue week; default: last valid issue week"),
+        total_crews: int = Query(PP.TOTAL_CREWS_DEFAULT, ge=0, le=PP.TOTAL_CREWS_MAX),
+        min_coverage_pct: int = Query(PP.MIN_COVERAGE_PCT_DEFAULT, ge=PP.MIN_COVERAGE_PCT_MIN,
+                                      le=PP.MIN_COVERAGE_PCT_MAX),
+        include_roi_alternative: bool = False,
+    ) -> dict:
+        """Hypothetical vector-control scenarios (low/base/high) on the ML baseline, using Task 2 crews."""
+        if issue_date is None:
+            issue_date = service.call("valid_issue_weeks")["last"]
+        results = service.call("forecast_all", issue_date, include_drivers=False, include_actual=False)
+        service.attach_weekly(results)
+        densities = service.ward_densities(results)
+        try:
+            body = build_intervention_simulation(results, densities, total_crews=total_crews,
+                                                 min_coverage_pct=min_coverage_pct,
+                                                 include_roi_alternative=include_roi_alternative)
+        except (PlanningDataError, AllocationInputError, InterventionInputError):
+            logger.exception("Intervention simulation could not be built")
+            raise ApiError(500, "planning_data_invalid",
+                           "The forecast data could not be converted into an intervention simulation.") from None
         return _envelope(issue_date=results[0]["issue_week"], model_version=results[0]["model_version"], **body)
 
     return app
