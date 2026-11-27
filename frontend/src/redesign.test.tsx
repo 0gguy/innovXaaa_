@@ -34,7 +34,9 @@ const CONSISTENT = {
 
 describe("ward forecast card (English)", () => {
   it("leads with ward, period, estimate, tier and alert", async () => {
-    await ready();
+    // First test in this file: same steps as ready(), with a longer initial-load wait for parallel-run load.
+    render(<App client={fakeClient()} />);
+    await screen.findByRole("heading", { name: "DNCC Ward 12" }, { timeout: 3000 });
     const detail = screen.getByRole("region", { name: "DNCC Ward 12" });
     expect(detail.querySelector(".result-num")).toHaveTextContent("31.2");
     expect(detail.querySelector(".result-weeks")).toHaveTextContent("Weeks beginning 11 Aug, 18 Aug and 25 Aug");

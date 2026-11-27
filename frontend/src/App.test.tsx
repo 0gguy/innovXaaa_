@@ -15,7 +15,9 @@ async function ready() {
 
 describe("dashboard", () => {
   it("shows the historical replay framing and the backend notice", async () => {
-    await ready();
+    // First test in this file: same steps as ready(), with a longer initial-load wait for parallel-run load.
+    render(<App client={fakeClient()} />);
+    await screen.findByRole("heading", { name: "DNCC Ward 12" }, { timeout: 3000 });
     expect(document.querySelector(".replay-badge")).toBeNull(); // header badge removed; the disclaimers remain
     expect(screen.getByRole("note")).toHaveTextContent(/Historical replay of a trained model/);
     expect(screen.getByText(/Not a live warning system/)).toBeInTheDocument();

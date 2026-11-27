@@ -24,6 +24,25 @@ export const en = {
   notice: "Historical replay of a trained model on bundled data through 29 Dec 2025. These are model estimates, not verified real-world warnings or live predictions.",
   connecting: "Connecting to the forecast service…",
 
+  // section navigation (only Overview exists today; the others are listed as planned, never as working)
+  nav: {
+    label: "Sections",
+    overview: "Overview",
+    weekly: "Weekly Outlook",
+    resources: "Resource Planning",
+    hospitals: "Hospital Planning",
+    interventions: "Intervention Explorer",
+    dispatch: "Dispatch Brief",
+    planned: "Not yet available",
+    plansSummary: "What the planned sections will show",
+    plansLead: "Only Overview works today. The other sections are still being built and show nothing yet.",
+    weeklyBody: "A week-by-week view for the selected ward, alongside the combined forecast.",
+    resourcesBody: "How a limited stock of supplies and field crews could be shared across wards by forecast risk.",
+    hospitalsBody: "Hypothetical hospital overflow: where extra patients could be sent if beds ran short.",
+    interventionsBody: "What-if comparisons of prevention measures, using assumed rather than measured effects.",
+    dispatchBody: "A read-only draft brief to review and export. It is never sent automatically.",
+  },
+
   // controls
   controlsLabel: "Choose city, ward and issue week",
   city: "City corporation",
@@ -366,6 +385,24 @@ export const bn: Dict = {
   noticeFallback: "পূর্বাভাসগুলো ঐতিহাসিক তথ্য থেকে পুনরায় চালানো মডেলের অনুমান, যাচাইকৃত বাস্তব সতর্কতা নয়।",
   notice: "এটি সংযুক্ত ঐতিহাসিক তথ্যের (২৯ ডিসেম্বর ২০২৫ পর্যন্ত) ওপর একটি প্রশিক্ষিত মডেলের পুনঃপ্রদর্শন। এগুলো মডেলের অনুমান; যাচাইকৃত বাস্তব সতর্কতা বা সরাসরি পূর্বাভাস নয়।",
   connecting: "পূর্বাভাস সেবার সঙ্গে সংযোগ হচ্ছে…",
+
+  nav: {
+    label: "বিভাগসমূহ",
+    overview: "সারসংক্ষেপ",
+    weekly: "সাপ্তাহিক পূর্বাভাস",
+    resources: "সম্পদ পরিকল্পনা",
+    hospitals: "হাসপাতাল পরিকল্পনা",
+    interventions: "প্রতিরোধ ব্যবস্থা যাচাই",
+    dispatch: "নির্দেশনার খসড়া",
+    planned: "এখনো চালু হয়নি",
+    plansSummary: "পরিকল্পিত বিভাগগুলোতে কী থাকবে",
+    plansLead: "এখন শুধু সারসংক্ষেপ কাজ করে। বাকি বিভাগগুলো তৈরি হচ্ছে, এখনো কিছু দেখায় না।",
+    weeklyBody: "বেছে নেওয়া ওয়ার্ডের জন্য সপ্তাহ ধরে ধরে দৃশ্য, সম্মিলিত পূর্বাভাসের পাশাপাশি।",
+    resourcesBody: "সীমিত সরঞ্জাম ও মাঠকর্মী দল পূর্বাভাসের ঝুঁকি অনুযায়ী ওয়ার্ডগুলোর মধ্যে কীভাবে ভাগ করা যায়।",
+    hospitalsBody: "কাল্পনিক পরিস্থিতি: শয্যা কম পড়লে বাড়তি রোগী কোন হাসপাতালে পাঠানো যেতে পারে।",
+    interventionsBody: "অনুমিত (মাপা নয়) প্রভাব ধরে বিভিন্ন প্রতিরোধ ব্যবস্থার “যদি এমন হয়” তুলনা।",
+    dispatchBody: "পর্যালোচনা ও রপ্তানির জন্য শুধু পড়ার উপযোগী খসড়া নির্দেশনা। এটি কখনো নিজে থেকে পাঠানো হয় না।",
+  },
 
   controlsLabel: "সিটি করপোরেশন, ওয়ার্ড ও ইস্যু সপ্তাহ বেছে নিন",
   city: "সিটি করপোরেশন",

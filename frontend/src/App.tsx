@@ -2,9 +2,11 @@ import { useMemo, useState } from "react";
 import { createClient, type ApiClient } from "./api/client";
 import type { Meta } from "./api/types";
 import { Controls, type Selection } from "./components/Controls";
+import { closeAllInfoPopovers } from "./components/InfoButton";
 import { Methodology } from "./components/Methodology";
 import { Overview } from "./components/Overview";
 import { ValidationDashboard, type ValidationLoader } from "./components/ValidationDashboard";
+import { isSectionAvailable, SectionNav, type SectionId } from "./components/SectionNav";
 import { ErrorPanel, LoadingPanel } from "./components/StatusPanel";
 import { WardDetail } from "./components/WardDetail";
 import { I18nProvider, useI18n } from "./i18n/I18n";
@@ -65,6 +67,15 @@ function Dashboard({ injected, validationLoader }: { injected?: ApiClient; valid
     document.getElementById("detail-anchor")?.scrollIntoView?.({ block: "start", behavior: "smooth" });
   };
 
+  // Section navigation is local state, not a router. Only available sections can become current; Overview
+  // (the dashboard below) is the only one today, so the page content does not branch yet.
+  const [section, setSection] = useState<SectionId>("overview");
+  const selectSection = (id: SectionId) => {
+    if (!isSectionAvailable(id)) return;
+    closeAllInfoPopovers();
+    setSection(id);
+  };
+
   return (
     <>
       <a className="skip-link" href="#main">
@@ -96,6 +107,8 @@ function Dashboard({ injected, validationLoader }: { injected?: ApiClient; valid
           </p>
         </div>
       </header>
+
+      <SectionNav current={section} onSelect={selectSection} />
 
       <main id="main" className="page">
         {metaReq.status === "loading" || metaReq.status === "idle" ? <LoadingPanel label={t.connecting} /> : null}
