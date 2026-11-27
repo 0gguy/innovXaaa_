@@ -199,6 +199,17 @@ export const en = {
   showTop: (n: string) => `Show top ${n} only`,
   showAll: (n: string) => `Show all ${n} wards`,
 
+  // contextual information buttons (small "i" beside an action; explain what it does and why)
+  info: {
+    retryLabel: "About Retry",
+    retryTitle: "Retry",
+    retryBody: "Asks the local forecast service for this data again. Your selected ward and week stay the same.",
+    listLabel: "About showing more or fewer wards",
+    listTitle: "Show more or fewer wards",
+    listBody: (n: string) =>
+      `Switches between the top ${n} wards and the full list, keeping your search and filters. It only changes how many rows you see; the forecasts stay the same.`,
+  },
+
   // errors
   retry: "Retry",
   errNetwork: "Can't reach the forecast service",
@@ -518,6 +529,16 @@ export const bn: Dict = {
   rowAlert: "আগাম সতর্কতা জারি হয়েছে",
   showTop: (n) => `শুধু প্রথম ${n}টি দেখান`,
   showAll: (n) => `সব ${n}টি ওয়ার্ড দেখান`,
+
+  info: {
+    retryLabel: "আবার চেষ্টা সম্পর্কে তথ্য",
+    retryTitle: "আবার চেষ্টা করুন",
+    retryBody: "এই তথ্যের জন্য স্থানীয় পূর্বাভাস সেবাকে আবার অনুরোধ পাঠায়। বেছে নেওয়া ওয়ার্ড ও সপ্তাহ একই থাকে।",
+    listLabel: "বেশি বা কম ওয়ার্ড দেখানো সম্পর্কে তথ্য",
+    listTitle: "বেশি বা কম ওয়ার্ড দেখান",
+    listBody: (n) =>
+      `শীর্ষ ${n}টি ওয়ার্ড আর পুরো তালিকার মধ্যে বদল করে, আপনার খোঁজ ও ফিল্টার বজায় রেখে। শুধু কয়টি সারি দেখা যাবে তা বদলায়; পূর্বাভাসের সংখ্যা একই থাকে।`,
+  },
 
   retry: "আবার চেষ্টা করুন",
   errNetwork: "পূর্বাভাস সেবায় পৌঁছানো যাচ্ছে না",

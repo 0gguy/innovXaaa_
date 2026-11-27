@@ -4,6 +4,7 @@ import { TIER_ORDER } from "../api/types";
 import { useI18n } from "../i18n/I18n";
 import { countByTier } from "../lib/format";
 import type { RequestState } from "../lib/useRequest";
+import { InfoButton } from "./InfoButton";
 import { EmptyPanel, ErrorPanel, LoadingPanel } from "./StatusPanel";
 import { TierChip } from "./TierChip";
 import { WardCharts } from "./WardCharts";
@@ -256,9 +257,12 @@ function WardTable({ forecasts, meta, selectedWard, onSelectWard }: BodyProps) {
         </table>
       )}
       {rows.length > PREVIEW_ROWS && (
-        <button type="button" className="btn btn-quiet" onClick={() => setExpanded((e) => !e)} aria-expanded={expanded}>
-          {expanded ? t.showTop(int(PREVIEW_ROWS)) : t.showAll(int(rows.length))}
-        </button>
+        <div className="action-with-info">
+          <button type="button" className="btn btn-quiet" onClick={() => setExpanded((e) => !e)} aria-expanded={expanded}>
+            {expanded ? t.showTop(int(PREVIEW_ROWS)) : t.showAll(int(rows.length))}
+          </button>
+          <InfoButton label={t.info.listLabel} title={t.info.listTitle} description={t.info.listBody(int(PREVIEW_ROWS))} />
+        </div>
       )}
     </div>
   );

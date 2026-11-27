@@ -1973,3 +1973,116 @@ html[lang="bn"] .valid-num {
   font-size: 0.9375rem;
   color: var(--ink);
 }
+
+/* ---------- contextual information buttons ---------- */
+/* A small "i" beside an action, opening a short explanation that floats above the page (portal,
+   position: fixed), so it never resizes or moves the card it belongs to. Colours, radii and lines reuse
+   the existing tokens; only motion timing and the control's own sizes are new. */
+:root {
+  --motion-fast: 150ms; /* the existing .btn transition time */
+  --ease-standard: ease;
+  --info-size: 28px; /* above the 24px minimum target size, smaller than the 44px main controls */
+  --info-pop-width: 20rem;
+  --info-pop-margin: 12px; /* kept free at each screen edge; matches INFO_VIEWPORT_MARGIN */
+}
+.action-with-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  justify-self: start;
+  max-width: 100%;
+}
+.info {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+}
+.info-btn {
+  display: inline-grid;
+  place-items: center;
+  width: var(--info-size);
+  height: var(--info-size);
+  padding: 0;
+  margin: 0;
+  color: var(--ink-3);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  transition:
+    color var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard);
+}
+.info-btn:hover,
+.info-btn[aria-expanded="true"] {
+  color: var(--teal);
+  background: var(--aqua-soft);
+}
+.info-btn[aria-expanded="true"] {
+  border-color: var(--ctl-edge);
+}
+.info-btn:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 50%;
+}
+.info-pop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 20;
+  width: max-content;
+  max-width: min(var(--info-pop-width), calc(100vw - 2 * var(--info-pop-margin)));
+  max-height: calc(100vh - 2 * var(--info-pop-margin));
+  overflow-y: auto;
+  padding: 12px 14px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--ctl-edge);
+  border-radius: var(--r-ctl);
+  box-shadow: 0 6px 18px var(--line);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  text-align: left;
+  opacity: 1;
+  transform: none;
+  visibility: visible;
+  transition:
+    opacity var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard),
+    visibility 0s linear 0s;
+}
+/* Closed: invisible and click-through at once in state; the fade-out is visual only. */
+.info-pop[data-state="closed"] {
+  opacity: 0;
+  transform: translateY(4px);
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard),
+    visibility 0s linear var(--motion-fast);
+}
+.info-pop[data-state="closed"][data-side="above"] {
+  transform: translateY(-4px);
+}
+.info-pop-title {
+  margin: 0 0 4px;
+  font-weight: 700;
+}
+.info-pop-body {
+  margin: 0;
+  color: var(--ink-2);
+}
+@media (prefers-reduced-motion: reduce) {
+  .info-btn,
+  .info-pop,
+  .info-pop[data-state="closed"] {
+    transition: none;
+  }
+  .info-pop[data-state="closed"],
+  .info-pop[data-state="closed"][data-side="above"] {
+    transform: none;
+  }
+}

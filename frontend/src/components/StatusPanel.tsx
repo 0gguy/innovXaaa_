@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { ApiError } from "../api/client";
 import type { I18n } from "../i18n/I18n";
 import { useI18n } from "../i18n/I18n";
+import { InfoButton } from "./InfoButton";
 
 export function describeError(error: ApiError, baseUrl: string, i: I18n): { title: string; body: string } {
   const { t, lang } = i;
@@ -33,9 +34,12 @@ export function ErrorPanel({
     <div className={`status status-error${compact ? " status-compact" : ""}`} role="alert">
       <h3>{title}</h3>
       <p lang={rawEnglish ? "en" : undefined}>{body}</p>
-      <button type="button" className="btn" onClick={onRetry}>
-        {i.t.retry}
-      </button>
+      <div className="action-with-info">
+        <button type="button" className="btn" onClick={onRetry}>
+          {i.t.retry}
+        </button>
+        <InfoButton label={i.t.info.retryLabel} title={i.t.info.retryTitle} description={i.t.info.retryBody} />
+      </div>
     </div>
   );
 }
