@@ -154,6 +154,16 @@ class ModelService:
                 "note": WEEKLY_NOTE,
             }
 
+    def ward_densities(self, results: list[dict]) -> dict[str, float]:
+        """population_density_sqkm per ward, from the same Phase 1 feature rows as these results.
+        Returns {} if the rows are unavailable (the planner then reports a data error)."""
+        try:
+            rows = self._feature_rows(results)
+            return {str(w): float(d) for w, d in zip(rows["ward_id"], rows["population_density_sqkm"])}
+        except Exception:
+            logger.exception("Could not read ward population densities")
+            return {}
+
     def _feature_rows(self, results: list[dict]):
         """The Phase 1 feature rows behind these results (same ward and issue week).
 

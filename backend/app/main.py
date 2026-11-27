@@ -1,12 +1,19 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import APP_MODE, APP_TITLE, APP_VERSION, REPLAY_NOTICE, get_cors_origins
-from .errors import register_error_handlers
+from .errors import ApiError, register_error_handlers
 from .model_service import ModelService, load_portable_forecaster, load_weekly_companion
+from .planning import parameters as PP
+from .planning.allocate import AllocationInputError
+from .planning.demand import PlanningDataError
+from .planning.scenario import build_plan
 from .schemas import HealthResponse
+
+logger = logging.getLogger("dengue_api")
 
 
 def _envelope(**payload) -> dict:
@@ -86,6 +93,32 @@ def create_app(model_loader=load_portable_forecaster, weekly_loader=load_weekly_
         if include_weekly:
             service.attach_weekly(results)
         return _envelope(issue_date=issue_date, count=len(results), forecasts=results)
+
+    @app.get("/allocation")
+    def allocation(
+        issue_date: str | None = Query(None, description="Monday issue week; default: last valid issue week"),
+        stock_pct: int = Query(PP.STOCK_PCT_DEFAULT, ge=PP.STOCK_PCT_MIN, le=PP.STOCK_PCT_MAX),
+        stock_pct_saline: int | None = Query(None, ge=PP.STOCK_PCT_MIN, le=PP.STOCK_PCT_MAX),
+        stock_pct_kits: int | None = Query(None, ge=PP.STOCK_PCT_MIN, le=PP.STOCK_PCT_MAX),
+        min_coverage_pct: int = Query(PP.MIN_COVERAGE_PCT_DEFAULT, ge=PP.MIN_COVERAGE_PCT_MIN,
+                                      le=PP.MIN_COVERAGE_PCT_MAX),
+        total_crews: int = Query(PP.TOTAL_CREWS_DEFAULT, ge=0, le=PP.TOTAL_CREWS_MAX),
+    ) -> dict:
+        """Minimum Coverage + Risk Priority plan for all wards (planning scenario, not inventory)."""
+        if issue_date is None:
+            issue_date = service.call("valid_issue_weeks")["last"]
+        results = service.call("forecast_all", issue_date, include_drivers=False, include_actual=False)
+        service.attach_weekly(results)
+        densities = service.ward_densities(results)
+        try:
+            plan = build_plan(results, densities, stock_pct=stock_pct, min_coverage_pct=min_coverage_pct,
+                              total_crews=total_crews, stock_pct_saline=stock_pct_saline,
+                              stock_pct_kits=stock_pct_kits)
+        except (PlanningDataError, AllocationInputError):
+            logger.exception("Allocation plan could not be built")
+            raise ApiError(500, "planning_data_invalid",
+                           "The forecast data could not be converted into a resource plan.") from None
+        return _envelope(issue_date=results[0]["issue_week"], model_version=results[0]["model_version"], **plan)
 
     return app
 
