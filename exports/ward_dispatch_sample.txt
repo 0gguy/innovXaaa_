@@ -1,0 +1,85 @@
+DENGUE OUTLOOK - SAMPLE EXPORT - Ward dispatch brief, text variants (scenario A)
+Generated offline by backend/scripts/generate_exports.py from GET /dispatch-brief.
+Sample of a draft planning brief: nothing was sent, dispatched or authorised.
+
+========================================================================
+SHORT VARIANT (SMS-style, ASCII, at most 459 characters)
+Request: GET /dispatch-brief?issue_date=2025-07-28&stock_pct=60&min_coverage_pct=30&total_crews=40&capacity_pct=75&intervention_scenario=base&scope=ward&ward_id=DSCC_Ward_04&audience=all&variant=short&format=text
+========================================================================
+DRAFT/NOT SENT. SIMULATED PLANNING SCENARIO. HISTORICAL REPLAY.
+DO-20250728-S60-F30-C40-H75-IBASE-WC
+DSCC Ward 04 (Dhaka South): issue 2025-07-28, forecast weeks 2025-08-11 to 2025-08-25.
+Forecast 35.0 cases, Critical tier, early alert yes.
+Saline 83 of 83 (COVERED), kits 41 of 41 (COVERED).
+Beds 2025-08-25: 4 units vs hypothetical ward capacity 4.
+More in the detailed brief.
+Estimates only. HUMAN VERIFICATION REQUIRED before any action.
+
+========================================================================
+DETAILED VARIANT (WhatsApp-ready plain text)
+Request: GET /dispatch-brief?issue_date=2025-07-28&stock_pct=60&min_coverage_pct=30&total_crews=40&capacity_pct=75&intervention_scenario=base&scope=ward&ward_id=DSCC_Ward_04&audience=all&variant=detailed&format=text
+========================================================================
+*DRAFT / NOT SENT*
+*SIMULATED PLANNING SCENARIO - HISTORICAL REPLAY*
+*HUMAN VERIFICATION REQUIRED*
+
+Prepared for: Ward response coordinator (role label only; no recipient or contact details)
+Scope: DSCC Ward 04, Dhaka South (ward)
+Scenario ID: DO-20250728-S60-F30-C40-H75-IBASE-WC
+Document ID: DO-20250728-S60-F30-C40-H75-IBASE-WC.WARD-DSCC-WARD-04.ALL.DETAILED
+Issue week: 2025-07-28
+Forecast weeks: 2025-08-11, 2025-08-18, 2025-08-25 (t+2 to t+4)
+Model: dengue-xgb-2to4w-1.1.0; weekly split: weekly companion model
+Scenario inputs (hypothetical): stock 60%, minimum coverage 30%, regional crews 40, bed capacity 75%, intervention base
+
+*1. Forecast-derived estimates*
+[FORECAST-DERIVED ESTIMATES]
+- Expected cases t+2 to t+4: 35.0 (by week: 2025-08-11 9.9; 2025-08-18 12.2; 2025-08-25 12.9)
+- Risk tier Critical; early alert yes; priority rank 1 of 20 in Dhaka South
+- Model estimates, not confirmed events.
+
+*2. Suggested saline and kit allocation (hypothetical stock)*
+[SUGGESTED ALLOCATION - HYPOTHETICAL STOCK SCENARIO]
+- Saline: suggest 83 of 83 planning units, deficit 0 (COVERED: full planning demand covered)
+- Kits: suggest 41 of 41 planning units, deficit 0 (COVERED: full planning demand covered)
+- Priority rank 1: tier Critical, early alert yes, density 74252 per sq km, forecast 35.0 cases
+- City context: saline 639 of 1065 suggested across the city (60.0%)
+
+*3. Hypothetical crew scenario*
+[HYPOTHETICAL CREW SCENARIO]
+- Suggested 1 of 6 hypothetical crews (below the minimum coverage floor)
+- City pool 12, city need 76
+- Crew numbers are a hypothetical budget, not real teams.
+
+*4. Hypothetical bed capacity and simulated within-city reassignment*
+[HYPOTHETICAL CAPACITY - SIMULATED WITHIN-CITY REASSIGNMENT]
+- Units are bed planning units, not patients, admissions or occupied beds.
+- Hypothetical ward capacity 4 units (75% scenario)
+- By week: 2025-08-11 demand 3, simulated out 0, in 0, unmet 0; 2025-08-18 demand 4, simulated out 0, in 0, unmet 0; 2025-08-25 demand 4, simulated out 0, in 0, unmet 0
+- City headline week 2025-08-25: unmet 0 units in this ward
+- Real capacity has not been verified.
+
+*5. Assumed-effect intervention scenario (not causal)*
+[ASSUMED-EFFECT INTERVENTION SCENARIO - NOT CAUSAL]
+- Selected base (maximum reduction 35%) with 1 hypothetical crew(s): 2.0 cases projected avoided; adjusted weekly cases 9.5 / 11.4 / 12.0
+- Comparison: low 0.9, base 2.0, high 3.1
+- Effects are assumptions, not learned from data; nothing has been carried out.
+
+*Human verification checklist*
+[ ] Forecast figures reviewed by the responsible surveillance or epidemiology role.
+[ ] Physical saline and diagnostic kit stock counted before any allocation decision.
+[ ] Real crew availability confirmed; crew numbers in this draft are hypothetical.
+[ ] Real bed capacity confirmed with each facility; capacity in this draft is hypothetical.
+[ ] Decisions about moving patients are clinical decisions made outside this tool.
+[ ] Intervention effects treated as assumed scenarios, not proven outcomes.
+[ ] Draft reviewed, and any action decided, by the responsible coordinator role.
+Reviewed by (role): ..........  Date: ..........
+
+*Limitations*
+- Historical replay on data that appear simulated; not a live or official plan.
+- Forecasts are expected values without prediction intervals.
+- No travel time, delivery logistics, facility locations or real occupancy data are used.
+- Nothing in this brief has been sent, carried out or authorised.
+
+Historical replay of a trained model on bundled data through 2025-12-29. These are model estimates, not verified real-world warnings or live predictions.
+Draft for planning review only. Not sent. No action authorised.

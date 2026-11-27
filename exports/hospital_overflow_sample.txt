@@ -1,0 +1,80 @@
+DENGUE OUTLOOK - SAMPLE EXPORT - City hospital overflow brief, text variants (scenario B)
+Generated offline by backend/scripts/generate_exports.py from GET /dispatch-brief.
+Sample of a draft planning brief: nothing was sent, dispatched or authorised.
+
+========================================================================
+SHORT VARIANT (SMS-style, ASCII, at most 459 characters)
+Request: GET /dispatch-brief?issue_date=2023-08-07&stock_pct=100&min_coverage_pct=30&total_crews=60&capacity_pct=75&intervention_scenario=base&scope=city&city=Dhaka+South&audience=hospital&variant=short&format=text
+========================================================================
+DRAFT/NOT SENT. SIMULATED PLANNING SCENARIO. HISTORICAL REPLAY.
+DO-20230807-S100-F30-C60-H75-IBASE-WC
+Dhaka South: issue 2023-08-07, forecast weeks 2023-08-21 to 2023-09-04.
+Beds 2023-09-04 (t+4): 76 units vs hypothetical capacity 64.
+Capacity baseline is retrospective.
+Simulated within-city reassignment 5 units; unmet 12 units.
+More in the detailed brief.
+Estimates only. HUMAN VERIFICATION REQUIRED before any action.
+
+========================================================================
+DETAILED VARIANT (WhatsApp-ready plain text)
+Request: GET /dispatch-brief?issue_date=2023-08-07&stock_pct=100&min_coverage_pct=30&total_crews=60&capacity_pct=75&intervention_scenario=base&scope=city&city=Dhaka+South&audience=hospital&variant=detailed&format=text
+========================================================================
+*DRAFT / NOT SENT*
+*SIMULATED PLANNING SCENARIO - HISTORICAL REPLAY*
+*HUMAN VERIFICATION REQUIRED*
+
+Prepared for: City hospital capacity coordinator (role label only; no recipient or contact details)
+Scope: Dhaka South (city corporation, 20 wards)
+Scenario ID: DO-20230807-S100-F30-C60-H75-IBASE-WC
+Document ID: DO-20230807-S100-F30-C60-H75-IBASE-WC.CITY-DHAKA-SOUTH.HOSPITAL.DETAILED
+Issue week: 2023-08-07
+Forecast weeks: 2023-08-21, 2023-08-28, 2023-09-04 (t+2 to t+4)
+Model: dengue-xgb-2to4w-1.1.0; weekly split: weekly companion model
+Scenario inputs (hypothetical): stock 100%, minimum coverage 30%, regional crews 60, bed capacity 75%, intervention base
+
+*1. Forecast-derived estimates*
+[FORECAST-DERIVED ESTIMATES]
+- Expected cases t+2 to t+4: 609.6 (by week: 2023-08-21 189.2; 2023-08-28 164.2; 2023-09-04 256.2)
+- Risk tiers: Critical 11, High 8, Medium 1, Low 0; early alerts 13
+- Highest priority wards:
+  1. DSCC Ward 04: Critical, early alert, 47.3 cases
+  2. DSCC Ward 06: Critical, early alert, 43.3 cases
+  3. DSCC Ward 10: Critical, early alert, 37.7 cases
+  4. DSCC Ward 19: Critical, early alert, 39.4 cases
+  5. DSCC Ward 08: Critical, early alert, 31.8 cases
+- and 15 more wards in the printable brief
+- Model estimates, not confirmed events.
+
+*2. Hypothetical bed capacity and simulated within-city reassignment*
+[HYPOTHETICAL CAPACITY - SIMULATED WITHIN-CITY REASSIGNMENT]
+- Units are bed planning units, not patients, admissions or occupied beds.
+- Hypothetical capacity 64 units (75% of baseline 86)
+- Headline week 2023-09-04 (t+4): demand 76, local 59, simulated within-city reassignment 5, unmet 12 in 11 wards
+- Proposed simulated reassignments (headline week):
+  DSCC Ward 04 -> DSCC Ward 02: 1 unit(s)
+  DSCC Ward 06 -> DSCC Ward 07: 1 unit(s)
+  DSCC Ward 10 -> DSCC Ward 14: 1 unit(s)
+  DSCC Ward 12 -> DSCC Ward 01: 1 unit(s)
+  DSCC Ward 19 -> DSCC Ward 17: 1 unit(s)
+- By week: t+2 demand 55, unmet 0; t+3 demand 49, unmet 0; t+4 demand 76, unmet 12
+- Capacity baseline is retrospective: it was calibrated on years that include this issue week.
+- Real capacity has not been verified.
+
+*Human verification checklist*
+[ ] Forecast figures reviewed by the responsible surveillance or epidemiology role.
+[ ] Real bed capacity confirmed with each facility; capacity in this draft is hypothetical.
+[ ] Decisions about moving patients are clinical decisions made outside this tool.
+[ ] Draft reviewed, and any action decided, by the responsible coordinator role.
+Reviewed by (role): ..........  Date: ..........
+
+*Warnings*
+- Issue week 2023-08-07 is before 2024: the capacity baseline was calibrated on 2016-2023 data, including weeks after this issue week (retrospective scenario, not information available at the time).
+
+*Limitations*
+- Historical replay on data that appear simulated; not a live or official plan.
+- Forecasts are expected values without prediction intervals.
+- No travel time, delivery logistics, facility locations or real occupancy data are used.
+- Nothing in this brief has been sent, carried out or authorised.
+
+Historical replay of a trained model on bundled data through 2025-12-29. These are model estimates, not verified real-world warnings or live predictions.
+Draft for planning review only. Not sent. No action authorised.

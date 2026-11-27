@@ -1,0 +1,4 @@
+# The sample exports are compared byte for byte by `backend/scripts/generate_exports.py --check`.
+# Keep LF line endings in every checkout, even where core.autocrlf would rewrite them.
+*.html text eol=lf
+*.txt text eol=lf
