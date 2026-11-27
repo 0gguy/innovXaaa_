@@ -5,8 +5,9 @@ import { useI18n } from "../i18n/I18n";
  * scrolling sideways on narrow screens, no sidebar).
  *
  * Semantics: a <nav> landmark with a list. Available sections are plain buttons and the current one carries
- * aria-current. This is deliberately NOT an ARIA tablist: today only Overview exists, so a tablist would have a
- * single tab and promise arrow-key switching between panels that do not exist. Planned sections are plain
+ * aria-current="page". This is deliberately NOT an ARIA tablist: each section replaces the page's main content like
+ * a page of its own (shared week/ward controls stay above it), which is navigation, so Tab/Enter/Space on native
+ * buttons is the whole keyboard model and there are no half-implemented tab roles. Planned sections are plain
  * text with a visible "Not yet available" tag, never buttons (enabled or disabled), so nothing can be focused,
  * pressed or selected as if it worked. What each planned section will hold is explained in a native
  * <details> below the strip, readable without hover and without focusing a disabled control.
@@ -25,7 +26,7 @@ export interface SectionDef {
 
 export const SECTIONS: readonly SectionDef[] = [
   { id: "overview", available: true },
-  { id: "weekly", available: false, body: "weeklyBody" },
+  { id: "weekly", available: true },
   { id: "resources", available: false, body: "resourcesBody" },
   { id: "hospitals", available: false, body: "hospitalsBody" },
   { id: "interventions", available: false, body: "interventionsBody" },

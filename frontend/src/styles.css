@@ -2350,3 +2350,124 @@ html[lang="bn"] .valid-num {
     transition: none;
   }
 }
+
+/* ---------- weekly outlook ---------- */
+/* Same card as the Overview and ward panels. One headline total, then the three forecast weeks as
+   readable rows with a quiet proportional bar (the number is always written out; the bar is decoration). */
+.weekly {
+  display: grid;
+  gap: 20px;
+  padding: 20px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  min-width: 0;
+}
+.weekly-replay {
+  max-width: 72ch;
+  padding: 10px 14px;
+  font-size: 0.9375rem;
+  color: var(--ink-2);
+  background: var(--paper);
+  border-radius: var(--r-ctl);
+}
+.weekly-total {
+  display: grid;
+  gap: 2px;
+  padding: 16px 18px;
+  background: var(--aqua-soft);
+  border-radius: var(--r-panel);
+  max-width: 34rem;
+}
+.weekly-total-label {
+  font-weight: 700;
+  color: var(--ink-2);
+}
+.weekly-total-num {
+  font-family: var(--serif);
+  font-size: clamp(2.25rem, 6vw, 3rem);
+  line-height: 1.1;
+  font-weight: 600;
+  color: var(--teal);
+}
+.weekly-unit {
+  font-family: var(--sans);
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+.weekly-weeks {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  min-width: 0;
+}
+.weekly-week {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-ctl);
+  min-width: 0;
+}
+.weekly-week-label {
+  font-weight: 700;
+  color: var(--teal);
+}
+.weekly-week-date {
+  font-size: 0.9375rem;
+  color: var(--ink-2);
+}
+.weekly-week-num {
+  font-family: var(--serif);
+  font-size: 1.75rem;
+  line-height: 1.2;
+  font-weight: 600;
+  color: var(--ink);
+}
+.weekly-bar {
+  display: block;
+  height: 8px;
+  margin-top: 4px;
+  background: var(--paper);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.weekly-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--aqua);
+  border-radius: 999px;
+}
+.weekly-note {
+  max-width: 70ch;
+  font-size: 0.875rem;
+  color: var(--ink-3);
+}
+.weekly-source {
+  display: grid;
+  gap: 6px;
+  max-width: 70ch;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.weekly-source-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.weekly-source-kind {
+  font-weight: 700;
+  color: var(--teal);
+}
+@media (min-width: 640px) {
+  .weekly {
+    padding: 28px 24px;
+  }
+}
+@media (min-width: 960px) {
+  .weekly {
+    padding: 36px 36px;
+  }
+}

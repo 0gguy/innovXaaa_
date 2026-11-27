@@ -19,7 +19,7 @@ afterEach(() => {
 });
 
 const DEFAULT_DATE = "2025-07-28";
-const PLANNED: SectionId[] = ["weekly", "resources", "hospitals", "interventions", "dispatch"];
+const PLANNED: SectionId[] = ["resources", "hospitals", "interventions", "dispatch"];
 
 function renderNav(onSelect: (id: SectionId) => void = () => {}, lang: "en" | "bn" = "en") {
   return render(
@@ -52,7 +52,7 @@ async function readStyles(): Promise<string> {
 
 // ---------------------------------------------------------------- structure and availability
 describe("section navigation structure", () => {
-  it("lists all six sections in order, with Overview as the only available and current one", () => {
+  it("lists all six sections in order; Overview and Weekly Outlook are available and Overview is current", () => {
     renderNav();
     const items = within(nav()).getAllByRole("listitem");
     expect(items.map((li) => li.querySelector(".section-tab, .section-tab-label")?.textContent)).toEqual([
@@ -63,10 +63,13 @@ describe("section navigation structure", () => {
       en.nav.interventions,
       en.nav.dispatch,
     ]);
-    expect(SECTIONS.filter((s) => s.available).map((s) => s.id)).toEqual(["overview"]);
+    expect(SECTIONS.filter((s) => s.available).map((s) => s.id)).toEqual(["overview", "weekly"]);
     const overview = within(nav()).getByRole("button", { name: en.nav.overview });
     expect(overview).toHaveAttribute("aria-current", "page");
     expect(overview).toHaveAttribute("type", "button");
+    const weekly = within(nav()).getByRole("button", { name: en.nav.weekly });
+    expect(weekly).not.toHaveAttribute("aria-current");
+    expect(weekly).toHaveAttribute("type", "button");
   });
 
   it("marks every planned section visibly and accessibly as not yet available", () => {
@@ -79,12 +82,12 @@ describe("section navigation structure", () => {
       expect(item.textContent).toBe(`${en.nav[id]}, ${en.nav.planned}`);
       expect(isSectionAvailable(id)).toBe(false);
     }
-    expect(within(nav()).getAllByText(en.nav.planned)).toHaveLength(5);
+    expect(within(nav()).getAllByText(en.nav.planned)).toHaveLength(4);
   });
 
   it("never exposes a planned section as a control: no buttons, links, disabled or focusable stand-ins", () => {
     renderNav();
-    expect(within(nav()).getAllByRole("button")).toHaveLength(1);
+    expect(within(nav()).getAllByRole("button")).toHaveLength(2); // Overview and Weekly Outlook only
     expect(within(nav()).queryAllByRole("link")).toHaveLength(0);
     for (const id of PLANNED) {
       const item = plannedItem(id);
@@ -120,9 +123,10 @@ describe("section navigation structure", () => {
     expect(details).toHaveTextContent(en.nav.plansLead);
     const terms = Array.from(details.querySelectorAll("dt")).map((d) => d.textContent);
     expect(terms).toEqual(PLANNED.map((id) => en.nav[id]));
-    for (const body of [en.nav.weeklyBody, en.nav.resourcesBody, en.nav.hospitalsBody, en.nav.interventionsBody, en.nav.dispatchBody]) {
+    for (const body of [en.nav.resourcesBody, en.nav.hospitalsBody, en.nav.interventionsBody, en.nav.dispatchBody]) {
       expect(details).toHaveTextContent(body);
     }
+    expect(details).not.toHaveTextContent(en.nav.weeklyBody); // available now, so no longer listed as planned
   });
 
   it("has no nested buttons and gives every control a name", () => {
@@ -149,6 +153,10 @@ describe("section navigation keyboard and activation", () => {
     expect(onSelect).toHaveBeenCalledTimes(2);
     expect(onSelect).toHaveBeenLastCalledWith("overview");
     await user.tab();
+    expect(within(nav()).getByRole("button", { name: en.nav.weekly })).toHaveFocus();
+    await user.keyboard("{Enter}");
+    expect(onSelect).toHaveBeenLastCalledWith("weekly");
+    await user.tab();
     const summary = within(nav()).getByText(en.nav.plansSummary);
     expect(summary).toHaveFocus(); // planned items are skipped: they are text, not stops
     expect(summary.tagName).toBe("SUMMARY"); // native disclosure: Enter/Space toggling is the browser's own (jsdom does not emulate it; checked in a real browser)
@@ -167,7 +175,8 @@ describe("section navigation keyboard and activation", () => {
       </I18nProvider>,
     );
     await user.click(screen.getByRole("button", { name: en.nav.overview }));
-    await user.click(plannedLabel("weekly"));
+    await user.click(screen.getByRole("button", { name: en.nav.weekly }));
+    await user.click(plannedLabel("resources"));
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
@@ -217,7 +226,7 @@ describe("section navigation translations", () => {
     await user.click(screen.getByRole("button", { name: en.langBnLabel }));
     const n = await screen.findByRole("navigation", { name: bn.nav.label });
     expect(within(n).getByRole("button", { name: bn.nav.overview })).toHaveAttribute("aria-current", "page");
-    expect(within(n).getAllByText(bn.nav.planned)).toHaveLength(5);
+    expect(within(n).getAllByText(bn.nav.planned)).toHaveLength(4);
   });
 });
 

@@ -9,6 +9,7 @@ import { ValidationDashboard, type ValidationLoader } from "./components/Validat
 import { isSectionAvailable, SectionNav, type SectionId } from "./components/SectionNav";
 import { ErrorPanel, LoadingPanel } from "./components/StatusPanel";
 import { WardDetail } from "./components/WardDetail";
+import { WeeklyOutlook } from "./components/WeeklyOutlook";
 import { I18nProvider, useI18n } from "./i18n/I18n";
 import { weeksBetween } from "./lib/dates";
 import { useRequest } from "./lib/useRequest";
@@ -67,8 +68,9 @@ function Dashboard({ injected, validationLoader }: { injected?: ApiClient; valid
     document.getElementById("detail-anchor")?.scrollIntoView?.({ block: "start", behavior: "smooth" });
   };
 
-  // Section navigation is local state, not a router. Only available sections can become current; Overview
-  // (the dashboard below) is the only one today, so the page content does not branch yet.
+  // Section navigation is local state, not a router. Only available sections can become current. The selection and
+  // the Overview's forecast requests live here, above every section, so switching sections never resets the
+  // selection and never re-requests the Overview forecasts; only the visible section's content is rendered.
   const [section, setSection] = useState<SectionId>("overview");
   const selectSection = (id: SectionId) => {
     if (!isSectionAvailable(id)) return;
@@ -123,20 +125,29 @@ function Dashboard({ injected, validationLoader }: { injected?: ApiClient; valid
               onChange={setSelection}
               busy={detail.status === "loading" || overview.status === "loading"}
             />
-            <div id="detail-anchor" className="detail-anchor" />
-            <WardDetail request={detail} meta={meta} baseUrl={client.baseUrl} />
-            <Overview
-              request={overview}
-              meta={meta}
-              issueDate={selection.date}
-              selectedWard={selection.ward}
-              onSelectWard={selectWard}
-              baseUrl={client.baseUrl}
-            />
+            {section === "overview" && (
+              <>
+                <div id="detail-anchor" className="detail-anchor" />
+                <WardDetail request={detail} meta={meta} baseUrl={client.baseUrl} />
+                <Overview
+                  request={overview}
+                  meta={meta}
+                  issueDate={selection.date}
+                  selectedWard={selection.ward}
+                  onSelectWard={selectWard}
+                  baseUrl={client.baseUrl}
+                />
+              </>
+            )}
+            {section === "weekly" && <WeeklyOutlook client={client} meta={meta} selection={selection} />}
           </>
         )}
-        <ValidationDashboard issueDate={selection?.date ?? null} loader={validationLoader} />
-        <Methodology meta={meta} />
+        {section === "overview" && (
+          <>
+            <ValidationDashboard issueDate={selection?.date ?? null} loader={validationLoader} />
+            <Methodology meta={meta} />
+          </>
+        )}
       </main>
     </>
   );
