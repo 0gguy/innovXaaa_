@@ -77,3 +77,54 @@ LIMITATIONS = [
     "No safety buffer is added to demand.",
     "Wards are planned independently; no travel time, delivery logistics or cost model.",
 ]
+
+# --------------------------------------------------------------------------- hospital routing (scenario)
+# HYPOTHETICAL city bed capacity baseline, in bed planning units. Retrospectively calibrated:
+# for each city, the mean over 2016-2023 of each calendar year's peak CITY-WIDE weekly bed planning
+# demand, where weekly ward demand = ROUND_HALF_UP(0.29844 * dengue_cases) from the bundled Phase 1 CSV
+# (ml/data/dengue_dataset.csv); the mean is then rounded ROUND_HALF_UP (Dhaka North: 86.5 -> 87).
+# Not an observed hospital inventory, staffed-bed count or point-in-time estimate.
+HOSPITAL_CITY_BASELINE_BEDS = {
+    "Chattogram": 46,
+    "Dhaka North": 87,
+    "Dhaka South": 86,
+    "Gazipur": 27,
+    "Narayanganj": 21,
+}
+HOSPITAL_BASELINE_FIRST_YEAR, HOSPITAL_BASELINE_LAST_YEAR = 2016, 2023
+HOSPITAL_BASELINE_DEFINITION = (
+    "Mean over 2016-2023 of each calendar year's peak city-wide weekly bed planning demand "
+    "(ward weekly demand = ROUND_HALF_UP(0.29844 x dengue_cases), bundled Phase 1 CSV), rounded ROUND_HALF_UP."
+)
+CAPACITY_PCT_MIN, CAPACITY_PCT_MAX, CAPACITY_PCT_DEFAULT = 25, 200, 100
+
+HOSPITAL_POLICY = {
+    "name": "within_city_overflow_routing",
+    "description": (
+        "Per forecast week and city: each ward first uses its own hypothetical capacity; remaining bed planning "
+        "units move one at a time from the sender with the lowest served ratio (local + transferred out) / demand "
+        "to the receiver with the lowest occupancy ratio (local + transferred in) / capacity, only within the "
+        "same city. Every ward pair in a city is assumed connected, so the units moved equal "
+        "min(total overflow, total spare capacity). No distance, travel time or facility data is used."
+    ),
+}
+
+HOSPITAL_ASSUMPTIONS = [
+    "Bed planning units are forecast-derived planning quantities, not patients, admissions or occupied beds.",
+    "Weekly bed planning demand = ROUND_HALF_UP(0.29844 x weekly expected cases) for t+2, t+3 and t+4; the "
+    "largest of the three equals the bed_planning_demand of GET /allocation.",
+    "Hypothetical city capacity = floor(capacity_pct x city baseline / 100), split equally across the city's "
+    "wards (remainder one unit per ward in ward_id order). It is not a real hospital inventory.",
+    "Transfers are planning reassignments between wards of the same city corporation only; every ward pair in "
+    "a city is assumed connected. No cross-city transfers.",
+    "Each forecast week is routed independently against the same capacities; weekly figures must not be "
+    "added together as beds or patients.",
+]
+
+HOSPITAL_LIMITATIONS = [
+    "No hospital locations, distances, travel times, specialties or real occupancy are available or used.",
+    "Capacity baseline is retrospectively calibrated on 2016-2023 data and split equally across wards; "
+    "real bed distribution is unknown.",
+    "Bed demand is an expected-value planning proxy with no prediction interval.",
+    "Historical replay on data that appear simulated; not an operational transfer plan.",
+]
