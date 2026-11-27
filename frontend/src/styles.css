@@ -2210,3 +2210,143 @@ html[lang="bn"] .valid-num {
     transition: none;
   }
 }
+
+/* ---------- planning scenario controls (shared by future planning sections) ---------- */
+/* A calm form card like .controls: groups flow into one column on phones and side by side when there is
+   room. Text boxes match the existing select/search inputs. Only existing tokens; errors reuse the
+   critical-tier red as text, never colour alone (the message says what is wrong). */
+.scenario {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  min-width: 0;
+}
+.scenario-head {
+  display: grid;
+  gap: 4px;
+}
+.scenario-lead,
+.scenario-week {
+  max-width: 62ch;
+  font-size: 0.9375rem;
+  color: var(--ink-2);
+}
+.scenario-week-label {
+  font-weight: 700;
+}
+.scenario-invalid:empty {
+  display: none;
+}
+.scenario-invalid {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--crit-bg);
+}
+.scenario-groups {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+  min-width: 0;
+}
+.scenario-group {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-ctl);
+  min-width: 0;
+}
+.scenario-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.scenario-field {
+  gap: 4px;
+}
+.scenario-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.scenario-input input {
+  width: 8rem;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1.5px solid var(--ctl-edge);
+  border-radius: var(--r-ctl);
+  transition: border-color var(--motion-fast) var(--ease-standard);
+}
+.scenario-input input:hover {
+  border-color: var(--teal-2);
+}
+.scenario-input input[aria-invalid="true"] {
+  border-color: var(--crit-bg);
+}
+.scenario-unit {
+  font-weight: 700;
+  color: var(--ink-2);
+}
+.scenario-hint {
+  font-size: 0.875rem;
+  color: var(--ink-3);
+}
+.scenario-error {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--crit-bg);
+}
+.scenario-more {
+  border-top: 1px solid var(--line-soft);
+}
+/* native disclosure marker kept (display: list-item), like the site's other summaries */
+.scenario-more summary {
+  width: fit-content;
+  min-height: 36px;
+  padding: 7px 0;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--teal);
+  cursor: pointer;
+}
+.scenario-more-body {
+  display: grid;
+  gap: 12px;
+  padding-bottom: 4px;
+}
+.scenario-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.scenario-check input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 2px 0 0;
+  accent-color: var(--teal);
+}
+.scenario-check label {
+  font-weight: 700;
+  color: var(--ink-2);
+  font-size: 0.9375rem;
+}
+@media (min-width: 640px) {
+  .scenario {
+    padding: 24px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scenario-input input {
+    transition: none;
+  }
+}
